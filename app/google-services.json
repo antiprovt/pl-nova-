@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "82354181740",
+    "project_id": "sichter-601aa",
+    "storage_bucket": "sichter-601aa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:82354181740:android:66af8d389dec89e3412a49",
+        "android_client_info": {
+          "package_name": "com.aistudio.shiftscheduler.wvykqp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCcyb0VcjpFQXj5gboYzSmdpp2OcSlZ92U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

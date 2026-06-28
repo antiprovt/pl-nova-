@@ -1,0 +1,2872 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Šichtér - Admin Panel Rozpisov</title>
+    <!-- Tailwind CSS Tailwind v3 via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts & Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b132b;
+            color: #e0e6ed;
+        }
+        .jetbrains-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbar styling for the calendar overflow */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 10px;
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0f1c3f;
+            border-radius: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1c356e;
+            border-radius: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #3a60b3;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            slate: '#0b132b',
+                            navy: '#1c2541',
+                            darkBlue: '#3a506b',
+                            primary: '#00b4d8',
+                            secondary: '#0077b6',
+                            accent: '#90e0ef',
+                            holiday: '#ef4444',
+                            weekend: '#1e293b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen pb-16">
+
+    <!-- Header / Banner -->
+    <header class="bg-gradient-to-r from-brand-navy to-brand-slate border-b border-gray-800 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-brand-primary flex items-center justify-center text-brand-slate shadow-lg shadow-brand-primary/20">
+                    <span class="material-symbols-outlined text-3xl font-bold">calendar_month</span>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                        Šichtér <span class="bg-brand-primary/10 text-brand-primary text-xs px-2.5 py-1 rounded-full border border-brand-primary/20">Admin Panel</span>
+                    </h1>
+                    <p class="text-sm text-gray-400">Správa smien v reálnom čase, Firestore a push notifikácie (FCM)</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <a href="#db-docs" class="text-xs sm:text-sm text-brand-accent hover:text-white transition duration-200 flex items-center gap-1.5 bg-brand-darkBlue/25 px-3 py-2 rounded-lg border border-brand-darkBlue/50">
+                    <span class="material-symbols-outlined text-lg">description</span>
+                    Dokumentácia DB
+                </a>
+                <span id="connection-badge" class="flex items-center gap-2 bg-red-950/40 text-red-400 border border-red-900 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium">
+                    <span class="h-2 w-2 rounded-full bg-red-500 animate-ping"></span>
+                    Odpojený od Firebase
+                </span>
+                
+                <!-- Active User Role Profile Panel -->
+                <div id="user-profile-panel" class="flex flex-wrap sm:flex-nowrap items-center gap-3 bg-brand-slate/40 border border-gray-800/80 px-3 py-2 rounded-xl">
+                    <span class="material-symbols-outlined text-brand-primary text-xl">account_circle</span>
+                    <div class="text-left">
+                        <h3 class="text-xs font-bold text-white flex items-center gap-1.5 leading-tight">
+                            <span id="profile-display-name">Načítavam...</span>
+                            <span id="profile-display-badge" class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-primary text-brand-slate">Rola</span>
+                        </h3>
+                        <p class="text-[9px] text-gray-500">Prihlásený v systéme</p>
+                    </div>
+                    <!-- Highlight for currently logged in employee (if role is zamestnanec) -->
+                    <div id="logged-highlight-box" class="hidden flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 px-2 py-1 rounded-lg text-[10px] text-amber-300">
+                        <span class="material-symbols-outlined text-xs">lightbulb</span>
+                        Aktívny
+                    </div>
+                    <button onclick="logoutCurrentUser()" class="bg-red-950/45 hover:bg-red-900 border border-red-900/60 text-red-300 font-medium px-2.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1 shadow-lg">
+                        <span class="material-symbols-outlined text-sm">logout</span>
+                        Odhlásiť
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-8">
+
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-gray-800 space-x-2">
+            <div class="px-6 py-3 font-semibold text-sm rounded-t-xl flex items-center gap-2 border-b-2 border-brand-primary text-brand-primary bg-brand-navy/30">
+                <span class="material-symbols-outlined text-lg">calendar_view_month</span>
+                Rozpis smien
+            </div>
+        </div>
+
+        <div id="web-tab-roster-content" class="space-y-8">
+
+        <!-- STEP 1: Firebase configuration interface -->
+        <section id="firebase-config-section" class="bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm">
+            <div class="flex justify-between items-center cursor-pointer" onclick="toggleSection('firebase-config-body')">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-brand-primary text-2xl">settings_applications</span>
+                    <h2 class="text-xl font-bold text-white">1. Nastavenia pripojenia Firebase</h2>
+                </div>
+                <span id="firebase-config-arrow" class="material-symbols-outlined text-gray-500 transform transition-transform duration-200">expand_less</span>
+            </div>
+
+            <div id="firebase-config-body" class="mt-6 space-y-4 transition-all duration-300">
+                <p class="text-sm text-gray-300">
+                    Pre zápis zmien do Firestore a odosielanie push správ zadajte vašu webovú konfiguráciu z projektu Firebase. Konfigurácia sa ukladá bezpečne lokálne vo vašom prehliadači (localStorage).
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">API Key</label>
+                        <input id="firebase-apiKey" type="password" placeholder="AIzaSy..." class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Auth Domain</label>
+                        <input id="firebase-authDomain" type="text" placeholder="project-id.firebaseapp.com" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Project ID</label>
+                        <input id="firebase-projectId" type="text" placeholder="project-id" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Storage Bucket</label>
+                        <input id="firebase-storageBucket" type="text" placeholder="project-id.appspot.com" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Messaging Sender ID</label>
+                        <input id="firebase-messagingSenderId" type="text" placeholder="8473205739" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">App ID</label>
+                        <input id="firebase-appId" type="password" placeholder="1:8473205739:web:9f..." class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-gray-800">
+                    <div class="flex items-center gap-2">
+                        <input id="remember-config" type="checkbox" checked class="h-4.5 w-4.5 text-brand-primary focus:ring-brand-primary border-gray-700 rounded bg-brand-slate">
+                        <label for="remember-config" class="text-sm text-gray-300">Zapamätať nastavenia v tomto prehliadači</label>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="clearSavedConfig()" class="px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/60 rounded-xl transition">
+                            Vyčistiť pamäť
+                        </button>
+                        <button id="btn-connect" onclick="initializeFirebaseApp()" class="bg-brand-primary hover:bg-brand-secondary text-brand-slate font-semibold px-5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-brand-primary/10">
+                            <span class="material-symbols-outlined text-lg font-bold">cloud_sync</span>
+                            Pripojiť k Firebase
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2: Roster configuration filters -->
+        <section class="bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm space-y-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-brand-primary text-2xl">calendar_view_month</span>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">2. Výber aktívneho mesiaca a stavu</h2>
+                        <p class="text-xs text-gray-400">Vyberte mesiac, ktorý plánujete spravovať alebo zverejniť</p>
+                    </div>
+                </div>
+
+                <!-- Sync status from Firebase indicator -->
+                <div id="firebase-status-banner" class="hidden flex items-center gap-2 bg-emerald-950/40 text-emerald-400 border border-emerald-900 px-4 py-2 rounded-xl text-sm">
+                    <span class="material-symbols-outlined text-base">cloud_done</span>
+                    Zmeny sa automaticky ukladajú do cloudu (Firestore)
+                </div>
+            </div>
+
+            <!-- Keep hidden select inputs to maintain DOM element compatibility with any standard layout checks -->
+            <select id="role-selector" class="hidden"><option value="zamestnanec">zamestnanec</option></select>
+            <div id="emp-selector-div" class="hidden"><select id="emp-selector"></select></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-gray-800">
+                <!-- Month selector dropdown -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Výber mesiaca</label>
+                    <div class="relative">
+                        <select id="month-selector" onchange="onMonthSelected()" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-3 text-white appearance-none focus:outline-none focus:border-brand-primary transition pr-10">
+                            <option value="0">December 2025 (Pôvodný)</option>
+                            <option value="1" selected>Január 2026</option>
+                            <option value="2">Február 2026</option>
+                            <option value="3">Marec 2026</option>
+                            <option value="4">Apríl 2026</option>
+                            <option value="5">Máj 2026</option>
+                            <option value="6">Jún 2026</option>
+                            <option value="7">Júl 2026</option>
+                            <option value="8">August 2026</option>
+                            <option value="9">September 2026</option>
+                            <option value="10">Október 2026</option>
+                            <option value="11">November 2026</option>
+                            <option value="12">December 2026</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-3 top-3.5 text-gray-400 pointer-events-none">expand_more</span>
+                    </div>
+                </div>
+
+                <!-- Published switch status -->
+                <div class="admin-only bg-brand-slate/40 border border-gray-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Stav zverejnenia rozpisu</h4>
+                        <div class="mt-2 flex items-center">
+                            <span id="publish-status-badge" class="px-3 py-1.5 text-[11px] font-bold rounded-xl uppercase tracking-wider border transition-all duration-300 bg-red-500/10 text-red-100 border-red-500/20 shadow-inner">
+                                Nezverejnený (pracovná verzia)
+                            </span>
+                        </div>
+                    </div>
+                    <!-- Kept hidden checkbox to preserve compatibility if anything else queries it -->
+                    <input type="checkbox" id="month-published-checkbox" onchange="onPublishStateChanged()" class="hidden">
+                </div>
+
+                <!-- Fast database action buttons -->
+                <div class="flex items-end">
+                    <button onclick="saveRosterToFirestore()" id="btn-save-remote" class="admin-only w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20">
+                        <span class="material-symbols-outlined text-lg">public</span>
+                        Zverejniť Rozpis
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Employee View Notice Banner -->
+        <div id="employee-view-banner" class="hidden bg-amber-950/20 border border-amber-900/50 text-amber-300 rounded-2xl p-4 flex items-center gap-3 mb-6">
+            <span class="material-symbols-outlined text-xl shrink-0 text-amber-400">visibility</span>
+            <div class="text-sm">
+                <span class="font-semibold text-white">Prehliadací režim zamestnanca:</span> Momentálne sledujete rozpis pre príslušníka <span id="logged-employee-name-notice" class="font-bold text-brand-primary">--</span>. Všetky administratívne úpravy, zmeny smien, reusporiadanie a posielanie push správ sú uzamknuté.
+            </div>
+        </div>
+
+        <!-- STEP 3: Roster Planner Grid Editor -->
+        <section class="bg-brand-navy/60 border border-gray-800 rounded-2xl shadow-md backdrop-blur-sm overflow-hidden">
+            <!-- Table Header info -->
+            <div class="px-6 py-5 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-brand-navy/90">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-brand-primary text-2xl">table_chart</span>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">3. Rozvrh smien a priradení smien</h2>
+                        <p class="text-xs text-gray-400">Kliknutím na ľubovoľnú bunku zamestnanca okamžite zmeníte jej typ</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="openAddEmployeeModal()" class="admin-only bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/20 rounded-xl px-4 py-2 text-sm font-medium transition flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-base">person_add</span> Pridať zamestnanca
+                    </button>
+                    <button onclick="resetRosterToFallback()" class="admin-only bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl px-4 py-2 text-sm font-medium transition flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-base">restart_alt</span> Obnoviť predvolené
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interative Roster Sheet Container with horizontal/vertical scroll and sticky headers -->
+            <div class="max-h-[75vh] overflow-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse table-fixed min-w-[1200px]">
+                    <thead class="sticky top-0 z-30 bg-brand-navy text-xs font-semibold text-gray-400 border-b border-gray-800 shadow-md">
+                        <tr id="roster-header-days">
+                            <!-- Populated dynamically via JS -->
+                        </tr>
+                        <tr id="roster-header-weeks" class="border-b border-gray-800">
+                            <!-- Populated dynamically via JS -->
+                        </tr>
+                    </thead>
+                    <!-- SECTION 1: TOP GROUP (Denní zamestnanci) -->
+                    <tbody class="divide-y divide-gray-800/40 text-sm">
+                        <tr class="bg-brand-slate/80 select-none">
+                            <td colspan="36" class="px-4 py-2 font-bold text-xs uppercase tracking-wider text-brand-primary/80 bg-brand-slate/90">
+                                ☀️ Denná skupina / Služobné zaradenia
+                            </td>
+                        </tr>
+                        <tr id="empty-top-state" class="hidden">
+                            <td colspan="36" class="px-6 py-4 text-center text-gray-500 italic">Žiadni zamestnanci v dennej skupine</td>
+                        </tr>
+                    </tbody>
+                    <!-- Employee rows generated dynamically -->
+                    <tbody class="divide-y divide-gray-800/40 text-sm" id="top-group-rows"></tbody>
+
+                    <!-- SECTION 2: BOTTOM GROUP (Smenári/Noční zamestnanci) -->
+                    <tbody class="divide-y divide-gray-800/40 text-sm">
+                        <tr class="bg-brand-slate/80 select-none">
+                            <td colspan="36" class="px-4 py-2 font-bold text-xs uppercase tracking-wider text-brand-accent/80 bg-brand-slate/90">
+                                🔄 Zmenová skupina / Nepretržitá prevádzka (Smeny 1,2,3,4)
+                            </td>
+                        </tr>
+                        <tr id="empty-bottom-state" class="hidden">
+                            <td colspan="36" class="px-6 py-4 text-center text-gray-500 italic">Žiadni zamestnanci v zmenovej skupine</td>
+                        </tr>
+                    </tbody>
+                    <!-- Employee rows generated dynamically -->
+                    <tbody class="divide-y divide-gray-800/40 text-sm" id="bottom-group-rows"></tbody>
+
+                    <!-- SECTION 3: DAILY PATROL COUNTS (Denný počet hliadok) -->
+                    <tbody class="divide-y divide-gray-800/40 text-sm" id="patrol-counts-rows"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- STEP 4: Communications & Messaging (Správy a Oznámenia) -->
+        <section class="w-full">
+            <div class="admin-only bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm space-y-4">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-brand-primary text-2xl">mail</span>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">4. Interné Správy a Oznamy</h2>
+                        <p class="text-xs text-gray-400">Poslať správy zamestnancom s očakávaným potvrdením prečítania</p>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-800 space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Komu odoslať (Prijímateľ)</label>
+                            <div class="relative">
+                                <select id="msg-target-type" onchange="window.onMessageTargetTypeChanged()" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition pr-10">
+                                    <option value="all">Všetkým (Everyone)</option>
+                                    <option value="shift">Zvolenej skupine/smene</option>
+                                    <option value="individual">Jednotlivcovi</option>
+                                </select>
+                                <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none">expand_more</span>
+                            </div>
+                        </div>
+                        
+                        <div id="msg-target-value-container" class="hidden">
+                            <label id="msg-target-value-label" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Vyberte upresnenie</label>
+                            <div class="relative">
+                                <select id="msg-target-value" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition pr-10 font-bold text-brand-accent">
+                                    <!-- Populated dynamically via JS -->
+                                </select>
+                                <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none">expand_more</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Priorita správy</label>
+                            <div class="relative">
+                                <select id="msg-priority" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition pr-10">
+                                    <option value="high">1. Vysoká</option>
+                                    <option value="normal" selected>2. Bežná</option>
+                                </select>
+                                <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none">expand_more</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Titulok správy</label>
+                        <input id="msg-title" type="text" placeholder="Napr. Dôležitý oznam pre zamestnancov" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Obsah správy</label>
+                        <textarea id="msg-body" rows="3" placeholder="Sem napíšte text správy..." class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition"></textarea>
+                    </div>
+
+                    <div class="flex justify-end pt-2">
+                        <button onclick="window.sendTargetedMessage()" id="btn-send-msg" class="bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold px-6 py-3 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-brand-primary/10">
+                            <span class="material-symbols-outlined text-lg font-bold">send</span>
+                            Odoslať Správu
+                        </button>
+                    </div>
+
+                    <!-- SENT MESSAGES MONITOR -->
+                    <div class="pt-6 border-t border-gray-800 space-y-3">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span class="material-symbols-outlined text-sm text-brand-accent">history</span>
+                            História správ a potvrdenie o prečítaní (Admin manažment)
+                        </h3>
+                        <div id="sent-messages-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                            <p class="text-xs text-gray-500 italic">Načítavam zoznam správ...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>>� Push Notifikáciu
+        <!-- Firestore Database schema documentation & instructions -->
+        <section id="db-docs" class="bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm space-y-4">
+            <div class="flex justify-between items-center cursor-pointer" onclick="toggleSection('db-rules-body')">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-brand-primary text-2xl">database</span>
+                    <h2 class="text-xl font-bold text-white">Návrh štruktúry databázy & Bezpečnostné pravidlá Firestore</h2>
+                </div>
+                <span id="db-rules-arrow" class="material-symbols-outlined text-gray-500">expand_more</span>
+            </div>
+
+            <div id="db-rules-body" class="hidden mt-6 space-y-6">
+                <!-- DB Schema explain block -->
+                <div class="space-y-4">
+                    <h3 class="text-base font-bold text-white border-b border-gray-800 pb-2">Prehľadná štruktúra databázy (JSON / NoSQL Firestore)</h3>
+                    <p class="text-sm text-gray-300">
+                        Viacúrovňová štruktúra udržiava rýchly prenos len žiadaných rozpisov pre zamedzenie masívnej spotrebe dát na mobilných prenosoch zamestnancov:
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-brand-slate p-5 rounded-xl border border-gray-800 text-xs jetbrains-mono space-y-2">
+                            <span class="text-brand-primary font-bold">Kolekcia: rosters</span><br>
+                            <span class="text-gray-500">// Dokument: month_2026_01</span><br>
+                            {<br>
+                            &nbsp;&nbsp;"monthIndex": <span class="text-amber-400">1</span>,<br>
+                            &nbsp;&nbsp;"year": <span class="text-amber-400">2026</span>,<br>
+                            &nbsp;&nbsp;"month": <span class="text-amber-400">1</span>,<br>
+                            &nbsp;&nbsp;"published": <span class="text-green-400">true</span>,<br>
+                            &nbsp;&nbsp;"lastUpdated": <span class="text-brand-accent">"2026-06-10T19:31:12Z"</span><br>
+                            }
+                        </div>
+
+                        <div class="bg-brand-slate p-5 rounded-xl border border-gray-800 text-xs jetbrains-mono space-y-2">
+                            <span class="text-brand-secondary font-bold">Podkolekcia: employees (pod dokumentom month_2026_01)</span><br>
+                            <span class="text-gray-500">// Dokument ID: Jan_Kovac</span><br>
+                            {<br>
+                            &nbsp;&nbsp;"name": <span class="text-green-400">"Kováč Jožo"</span>,<br>
+                            &nbsp;&nbsp;"category": <span class="text-green-400">"top"</span>,<br>
+                            &nbsp;&nbsp;"totalHours": <span class="text-brand-accent">"172,5"</span>,<br>
+                            &nbsp;&nbsp;"shifts": {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"1": { "day": 1, "code": "R", "hours": "7,5" },<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"2": { "day": 2, "code": "SR", "hours": "11,5" }<br>
+                            &nbsp;&nbsp;}<br>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Firestore Rules Code block -->
+                <div class="space-y-4">
+                    <h3 class="text-base font-bold text-white border-b border-gray-800 pb-2">Zabezpečenie Firestore Rules</h3>
+                    <p class="text-sm text-gray-300">
+                        Vložte tieto bezpečnostné pravidlá do konzoly Firebase Firestore (záložka Rules) pre overovanie rolí. Smenári majú povolené len čítať, kým administrátori s overeným emailom (alebo s rovnakými administrátorskými právami) majú práva na plný zápis:
+                    </p>
+                    <div class="bg-brand-slate p-5 rounded-xl border border-gray-800 text-xs text-brand-accent jetbrains-mono whitespace-pre overflow-x-auto">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Rozpisy a jednotliví zamestnanci
+    match /rosters/{rosterId} {
+      allow read: if true; // Zamestnanci čítajú bez registrácie
+      allow write: if request.auth != null && request.auth.token.email.matches('(?i).*admin.*|.*antipro18@gmail.com');
+      
+      match /employees/{employeeId} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.token.email.matches('(?i).*admin.*|.*antipro18@gmail.com');
+      }
+    }
+
+    // Žiadosti o push notifikácie
+    match /fcm_requests/{requestId} {
+      allow read: if false; // Zamestnanci nečítajú logy správ
+      allow write: if request.auth != null && request.auth.token.email.matches('(?i).*admin.*|.*antipro18@gmail.com');
+    }
+  }
+}</div>
+                </div>
+            </div>
+        </section>
+
+        </div> <!-- End of web-tab-roster-content -->
+
+
+    </main>
+
+    <!-- Modal dialogue: Edit Shift Cells -->
+    <div id="cell-edit-modal" class="hidden fixed inset-0 bg-brand-slate/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 id="modal-employee-name" class="text-lg font-bold text-white">Editor Smeny</h3>
+                    <p id="modal-shift-date" class="text-xs text-gray-400 mt-0.5">Dátum: --</p>
+                </div>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="space-y-4 pt-1">
+                <!-- Guest / Admin Container -->
+                <div id="employee-view-container" class="space-y-4">
+                    <!-- Admin-only elements inside modal -->
+                    <div class="admin-only-modal space-y-4">
+                        <!-- Preset shift options quick grid -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Typ služby / Status dňa</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button onclick="setModalPresets('SR', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">SR (11,5)</button>
+                                <button onclick="setModalPresets('SN', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">SN (11,5)</button>
+                                <button onclick="setModalPresets('R', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">R (11,5)</button>
+                                <button onclick="setModalPresets('N', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">N (11,5)</button>
+                                <button onclick="setModalPresets('PR', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">PR (11,5)</button>
+                                <button onclick="setModalPresets('PN', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">PN (11,5)</button>
+                                <button onclick="setModalPresets('P', '7,5')" style="background-color: #64748B; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#64748B]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">P (7,5)</button>
+                                <button onclick="setModalPresets('D', '7,5')" style="background-color: #FFEA00; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#FFEA00]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">D (7,5)</button>
+                                <button onclick="setModalPresets('CH', '7,5')" style="background-color: #14532D; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#14532D]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">CH (7,5)</button>
+                                <button onclick="setModalPresets('Par', '7,5')" style="background-color: #06B6D4; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#06B6D4]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">Par (7,5)</button>
+                                <button onclick="setModalPresets('KZ', '11,5')" style="background-color: #D946EF; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#D946EF]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">KZ (11,5)</button>
+                                <button onclick="setModalPresets('V', '7,5')" style="background-color: #8B5A2B; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#8B5A2B]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">V (7,5)</button>
+                                <button onclick="setModalPresets('', '')" style="background-color: #475569; color: #F1F5F9;" class="col-span-4 py-3 text-xs font-extrabold rounded-xl border border-gray-700 hover:bg-gray-800 transition transform hover:scale-[1.01] active:scale-95 shadow-sm flex items-center justify-center gap-1">
+                                    <span class="material-symbols-outlined text-sm">delete</span> Voľno (Zrušiť smenu)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="h-px bg-gray-800 my-4"></div>
+
+                        <!-- Custom shift fields -->
+                        <div class="space-y-4">
+                            <input id="modal-input-code" type="hidden">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Počet Hodín</label>
+                                <input id="modal-input-hours" type="text" placeholder="Hodiny (napr. 7,5 alebo 11,5)" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                            </div>
+                        </div>
+
+                        <div class="h-px bg-gray-800 my-4"></div>
+
+                        <!-- Copy/Move Shift tools -->
+                        <div class="bg-brand-slate/40 border border-gray-800/80 p-4 rounded-xl space-y-3">
+                            <label class="block text-xs font-semibold text-orange-400 uppercase tracking-wider">Kopírovať / Presunúť Smenu do iného dňa</label>
+                            <div class="flex items-center gap-2">
+                                <div class="relative flex-1">
+                                    <select id="modal-move-target-day" class="w-full bg-brand-navy border border-gray-700 rounded-lg px-3 py-2 text-xs text-white appearance-none focus:outline-none focus:border-brand-primary transition pr-8">
+                                        <!-- Populated dynamically -->
+                                    </select>
+                                    <span class="material-symbols-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-xs">expand_more</span>
+                                </div>
+                                <button onclick="executeMoveOrCopyShift(false)" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-2 rounded-lg text-xs transition flex items-center justify-center">Kopírovať</button>
+                                <button onclick="executeMoveOrCopyShift(true)" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-2 rounded-lg text-xs transition flex items-center justify-center">Presunúť</button>
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-gray-400 italic">
+                            Chcete vymazať smenu z tohto dňa? Ponechajte políčka prázdne a uložte zmenu.
+                        </div>
+                    </div>
+
+                    <!-- Read-only panel for normal employees -->
+                    <div id="employee-only-modal" class="hidden space-y-4 text-center py-4 bg-brand-slate/20 rounded-2xl border border-gray-800/40 p-4">
+                        <div class="flex flex-col items-center justify-center p-3">
+                            <div id="modal-emp-info-code" class="text-4xl font-extrabold text-brand-primary tracking-wider mb-1">R</div>
+                            <div id="modal-emp-info-hours" class="text-sm font-semibold text-white">7,5 hod</div>
+                        </div>
+                        <div class="border-t border-gray-800/60 pt-3">
+                            <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Popis zaradenia</p>
+                            <span id="modal-emp-info-desc" class="text-sm font-bold text-gray-200">Ranná smenu (7,5 hod)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-3">
+                <button onclick="closeEditModal()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-3 rounded-xl transition">
+                    Zrušiť
+                </button>
+                <button onclick="submitModalShiftChange()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition shadow-lg shadow-brand-primary/10">
+                    Potvrdiť & Uložiť
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal dialogue: Add Employee -->
+    <div id="add-employee-modal" class="hidden fixed inset-0 bg-brand-slate/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-lg font-bold text-white">Pridať zamestnanca</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Vytvorte nového zamestnanca v systéme</p>
+                </div>
+                <button onclick="closeAddEmployeeModal()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Meno Zamestnanca (s titulom)</label>
+                    <input id="new-emp-name" type="text" placeholder="Napr. Mgr. Kováč J." class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pracovná Skupina</label>
+                    <div class="relative">
+                        <select id="new-emp-group" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-white appearance-none focus:outline-none focus:border-brand-primary transition pr-10">
+                            <option value="top">☀️ Denná skupina / Dennist </option>
+                            <option value="bottom">🔄 Zmenár (Smeny 1,2,3,4)</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none">expand_more</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-3">
+                <button onclick="closeAddEmployeeModal()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-3 rounded-xl transition">
+                    Zrušiť
+                </button>
+                <button onclick="submitAddEmployee()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition shadow-lg shadow-brand-primary/10">
+                    Pridať do tabuľky
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN IMPLEMENTATION JAVASCRIPT: Modular Firebase SDK Loading -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, doc as firestoreDoc, runTransaction, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Global variables inside our Module scope
+        window.firebaseApp = null;
+        window.firestoreDb = null;
+        window.firebaseConnected = false;
+
+        // =========================================================================
+        // TU VLOŽTE SVOJU FIREBASE WEBOVÚ KONFIGURÁCIU, ABY BOL WEB ADMIN AUTOMATICKY PREPOJENÝ:
+        // =========================================================================
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyAEovC7FcSL2SGluunYTrPCKl283F6kjKQ",
+            authDomain: "sichter-601aa.firebaseapp.com",
+            projectId: "sichter-601aa",
+            storageBucket: "sichter-601aa.firebasestorage.app",
+            messagingSenderId: "82354181740",
+            appId: "1:82354181740:web:244c31eb1185d774412a49"
+        };
+        // =========================================================================
+
+        // Helper to programmatically construct employee objects for the fallbacks
+        function createEmployeeJS(name, list) {
+            const shifts = {};
+            for (let i = 0; i < list.length; i += 3) {
+                const day = list[i];
+                const code = list[i + 1];
+                const hours = list[i + 2];
+                shifts[day] = { day, code, hours };
+            }
+            return { name, shifts };
+        }
+
+        // Programmatic Fallbacks - matching the Android Kotlin defaults exactly to preserve accuracy
+        const decemberTopFallback = [
+            createEmployeeJS("Mgr. Adámik M.", [
+                1, "D", "7,5", 2, "R", "7,5", 3, "R", "7,5", 4, "R", "7,5", 5, "R", "7,5",
+                8, "R", "7,5", 9, "R", "7,5", 10, "R", "7,5", 11, "R", "7,5", 12, "R", "7,5",
+                15, "R", "7,5", 16, "R", "7,5", 17, "R", "7,5", 18, "R", "7,5", 19, "R", "7,5",
+                22, "R", "7,5", 23, "R", "7,5", 24, "R", "7,5", 25, "R", "7,5", 26, "R", "7,5",
+                29, "R", "7,5", 30, "R", "7,5", 31, "R", "7,5"
+            ]),
+            createEmployeeJS("Bc. Kovančík", [
+                1, "R", "7,5", 2, "R", "7,5", 3, "R", "7,5", 4, "R", "7,5", 5, "R", "7,5",
+                8, "R", "7,5", 9, "R", "7,5", 10, "R", "7,5", 11, "R", "7,5", 12, "D", "7,5",
+                15, "R", "7,5", 16, "D", "7,5", 17, "D", "7,5", 18, "D", "7,5", 19, "D", "7,5",
+                22, "D", "7,5", 23, "D", "7,5", 24, "D", "7,5", 25, "D", "7,5", 26, "R", "7,5",
+                29, "R", "7,5", 30, "R", "7,5", 31, "R", "7,5"
+            ]),
+            createEmployeeJS("Kováčová R.", [
+                1, "R", "7,5", 2, "R", "7,5", 3, "R", "7,5", 4, "R", "7,5", 5, "R", "7,5",
+                8, "R", "7,5", 9, "R", "7,5", 10, "R", "7,5", 11, "R", "7,5", 12, "R", "7,5",
+                15, "R", "7,5", 16, "R", "7,5", 17, "R", "7,5", 18, "R", "7,5", 19, "R", "7,5",
+                22, "R", "7,5", 23, "R", "7,5", 24, "R", "7,5", 25, "R", "7,5", 26, "R", "7,5",
+                29, "R", "7,5", 30, "R", "7,5", 31, "R", "7,5"
+            ]),
+            createEmployeeJS("Bc. Adámik R.", [
+                1, "CH", "7,5", 2, "CH", "7,5", 3, "CH", "7,5", 4, "CH", "7,5", 5, "CH", "7,5",
+                8, "CH", "7,5", 9, "CH", "7,5", 10, "CH", "7,5", 11, "CH", "7,5", 12, "CH", "7,5",
+                15, "CH", "7,5", 16, "CH", "7,5", 17, "CH", "7,5", 18, "CH", "7,5", 19, "CH", "7,5",
+                22, "CH", "7,5", 23, "CH", "7,5", 24, "CH", "7,5", 25, "CH", "7,5", 26, "CH", "7,5",
+                29, "CH", "7,5", 30, "CH", "7,5", 31, "CH", "7,5"
+            ]),
+            createEmployeeJS("Roštáš A.", [
+                1, "R", "7,5", 2, "R", "7,5", 3, "R", "7,5", 4, "SR", "11,5", 5, "R", "7,5",
+                8, "R", "7,5", 9, "R", "7,5", 10, "R", "7,5", 11, "R", "7,5", 12, "R", "7,5",
+                15, "R", "7,5", 16, "R", "7,5", 17, "R", "7,5", 18, "R", "7,5", 19, "R", "7,5",
+                22, "R", "7,5", 23, "D", "7,5", 24, "D", "7,5", 25, "D", "7,5", 26, "R", "7,5",
+                29, "D", "7,5", 30, "D", "7,5", 31, "D", "7,5"
+            ]),
+            createEmployeeJS("Bc. Peťko M.", [
+                1, "R", "7,5", 2, "R", "7,5", 3, "R", "7,5", 4, "R", "7,5", 5, "SN", "11,5",
+                8, "SR", "11,5", 9, "SN", "11,5", 10, "R", "7,5", 11, "R", "7,5", 12, "R", "7,5",
+                15, "R", "7,5", 16, "R", "7,5", 17, "R", "7,5", 18, "R", "7,5", 19, "R", "7,5",
+                22, "R", "7,5", 23, "R", "7,5", 24, "R", "7,5", 25, "R", "7,5", 26, "R", "7,5",
+                29, "R", "7,5", 30, "R", "7,5", 31, "R", "7,5"
+            ]),
+            createEmployeeJS("Bc. Šebelédy", [
+                1, "R", "7,5", 2, "R", "7,5", 3, "R", "7,5", 4, "SN", "13,5",
+                8, "R", "7,5", 9, "R", "7,5", 10, "R", "7,5", 11, "R", "7,5", 12, "SR", "11,5",
+                15, "SR", "11,5", 16, "R", "7,5", 17, "R", "7,5", 18, "R", "7,5", 19, "R", "7,5",
+                22, "R", "7,5", 23, "SR", "11,5", 24, "R", "7,5", 25, "R", "7,5", 26, "R", "7,5",
+                29, "R", "7,5", 30, "R", "7,5", 31, "R", "7,5"
+            ]),
+            createEmployeeJS("Mgr. Krenčan", [
+                1, "Par", "7,5", 2, "R", "7,5", 3, "R", "7,5", 4, "R", "7,5", 5, "R", "7,5",
+                8, "R", "7,5", 9, "R", "7,5", 10, "SR", "11,5", 11, "R", "7,5", 12, "R", "7,5",
+                15, "R", "7,5", 16, "R", "7,5", 17, "R", "7,5", 18, "R", "7,5", 19, "R", "7,5",
+                22, "R", "7,5", 23, "R", "7,5", 24, "R", "7,5", 25, "R", "7,5", 26, "R", "7,5",
+                29, "SR", "11,5", 30, "KZV", "7,5", 31, "KZV", "7,5"
+            ]),
+            createEmployeeJS("Bc. Töröková", [
+                1, "CH", "7,5", 2, "CH", "7,5", 3, "CH", "7,5", 4, "CH", "7,5", 5, "CH", "7,5",
+                8, "R", "7,5", 9, "R", "7,5", 10, "R", "7,5", 11, "SN", "11,5",
+                15, "R", "7,5", 16, "R", "7,5", 17, "SR", "11,5", 18, "R", "7,5", 19, "R", "7,5",
+                22, "D", "7,5", 23, "D", "7,5", 24, "D", "7,5", 25, "D", "7,5", 26, "D", "7,5",
+                29, "R", "7,5", 30, "R", "7,5", 31, "R", "7,5"
+            ]),
+            createEmployeeJS("Bielik R.", [
+                3, "SR", "11,5", 4, "D", "11,5", 7, "SR", "11,5", 8, "SN", "11,5",
+                11, "SR", "11,5", 12, "SN", "11,5", 15, "D", "11,5", 16, "SN", "11,5",
+                19, "SR", "11,5", 20, "SN", "11,5", 23, "D", "11,5", 24, "SR", "11,5",
+                27, "SR", "11,5", 28, "SN", "11,5", 31, "SR", "11,5"
+            ]),
+            createEmployeeJS("Fábry J.", [
+                4, "D", "11,5", 5, "PN", "13,5", 8, "D", "11,5", 9, "D", "11,5", 10, "P", "7,5",
+                12, "D", "11,5", 13, "PR", "5,0", 14, "PN", "11,5", 15, "N", "11,5",
+                18, "PR", "5,0", 19, "PN", "11,5", 22, "R", "11,5", 23, "N", "11,5",
+                24, "PN", "11,5", 28, "N", "11,5", 31, "R", "11,5"
+            ]),
+            createEmployeeJS("Kazár D.", [
+                2, "PR", "11,5", 3, "PN", "13,5", 4, "CH", "11,5", 5, "CH", "11,5", 6, "CH", "11,5",
+                7, "CH", "11,5", 8, "P", "11,5", 9, "P", "11,5", 10, "P", "11,5", 11, "P", "11,5",
+                12, "CH", "11,5", 13, "CH", "11,5", 14, "CH", "11,5", 17, "PR", "11,5", 18, "PN", "11,5",
+                22, "R", "11,5", 23, "N", "11,5", 26, "N", "11,5", 27, "D", "11,5", 30, "D", "11,5"
+            ]),
+            createEmployeeJS("PhDr. Kabát", [
+                2, "PR", "11,5", 3, "R", "11,5", 4, "P", "2,0", 7, "N", "11,5",
+                9, "N", "11,5", 10, "R", "11,5", 11, "PR", "11,5", 12, "D", "11,5",
+                14, "KZS", "11,5", 15, "KZS", "11,5", 16, "D", "11,5", 17, "D", "11,5",
+                21, "D", "11,5", 26, "PR", "11,5", 27, "PN", "11,5"
+            ]),
+            createEmployeeJS("Polyák A.", [
+                3, "R", "11,5", 4, "N", "13,5", 7, "PR", "11,5", 8, "PN", "11,5",
+                11, "KZS", "11,5", 12, "KZS", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "R", "11,5", 20, "N", "11,5", 23, "PR", "11,5", 24, "PN", "11,5",
+                27, "R", "11,5", 28, "N", "11,5", 31, "PR", "11,5"
+            ]),
+            createEmployeeJS("Bc. Petráš A.", [
+                3, "R", "11,5", 4, "N", "13,5", 7, "PR", "11,5", 8, "PN", "11,5",
+                11, "KZS", "11,5", 12, "KZS", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "R", "11,5", 20, "N", "11,5", 23, "PR", "11,5", 24, "PN", "11,5",
+                27, "R", "11,5", 28, "N", "11,5", 31, "PR", "11,5"
+            ]),
+            createEmployeeJS("Bc. Kelo R.", [
+                1, "SN", "11,5", 4, "D", "11,5", 5, "D", "11,5", 7, "D", "11,5", 8, "D", "11,5",
+                11, "D", "11,5", 12, "SN", "11,5", 15, "SR", "11,5", 16, "SN", "11,5",
+                19, "SR", "11,5", 20, "SN", "11,5", 23, "SR", "11,5", 24, "SN", "11,5",
+                27, "SR", "11,5", 28, "SN", "11,5"
+            ]),
+            createEmployeeJS("Andruška Z.", [
+                1, "N", "11,5", 3, "Par", "11,5", 4, "PN", "11,5", 7, "PR", "11,5", 8, "P", "7,5",
+                11, "R", "11,5", 12, "N", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "R", "11,5", 20, "N", "11,5", 23, "PR", "11,5", 24, "PN", "11,5",
+                28, "R", "11,5"
+            ]),
+            createEmployeeJS("Bc. Masaryk", [
+                1, "PN", "11,5", 3, "PR", "11,5", 4, "N", "11,5", 6, "Par", "11,5", 7, "Par", "11,5",
+                11, "R", "11,5", 12, "PN", "11,5", 15, "R", "11,5", 16, "N", "11,5",
+                19, "PR", "11,5", 20, "PN", "11,5", 23, "PR", "11,5", 24, "PN", "11,5",
+                27, "R", "11,5", 28, "D", "11,5"
+            ]),
+            createEmployeeJS("Šovčík M.", [
+                1, "PN", "11,5", 3, "D", "11,5", 4, "D", "11,5", 7, "PN", "11,5",
+                10, "PR", "11,5", 11, "PR", "11,5", 12, "PN", "11,5", 15, "R", "11,5", 16, "N", "11,5",
+                19, "PR", "11,5", 20, "PN", "11,5", 23, "R", "11,5", 24, "N", "11,5",
+                27, "R", "11,5", 28, "N", "11,5"
+            ])
+        ];
+
+        const decemberBottomFallback = [
+            createEmployeeJS("Bc. Obert L.", [
+                1, "SR", "11,5", 2, "SN", "11,5", 4, "P", "2,0", 5, "SR", "11,5", 6, "SN", "11,5",
+                9, "SR", "11,5", 10, "SN", "11,5", 13, "SR", "11,5", 14, "SN", "11,5",
+                17, "SN", "11,5", 20, "SR", "11,5", 21, "SN", "11,5", 24, "SR", "11,5",
+                25, "SN", "11,5", 28, "D", "11,5", 29, "SN", "11,5"
+            ]),
+            createEmployeeJS("Adámik P.", [
+                1, "R", "11,5", 3, "PR", "11,5", 4, "R", "11,5", 5, "N", "11,5",
+                9, "P", "11,5", 10, "PN", "11,5", 11, "PN", "11,5", 12, "D", "11,5",
+                16, "R", "11,5", 17, "N", "11,5", 20, "D", "11,5", 21, "D", "11,5",
+                24, "PR", "11,5", 25, "N", "11,5", 28, "D", "11,5", 29, "D", "11,5"
+            ]),
+            createEmployeeJS("Gacs Š.", [
+                1, "Par", "11,5", 2, "D", "11,5", 4, "P", "2,0", 5, "R", "11,5", 6, "D", "11,5",
+                10, "PR", "11,5", 11, "PN", "11,5", 13, "PR", "11,5", 14, "PN", "11,5",
+                16, "R", "11,5", 17, "N", "11,5", 20, "R", "11,5", 21, "R", "11,5",
+                24, "PR", "11,5", 25, "PN", "11,5", 28, "PR", "11,5", 29, "PN", "11,5"
+            ]),
+            createEmployeeJS("Bc. Bariš D.", [
+                1, "R", "11,5", 2, "N", "11,5", 4, "P", "2,0", 5, "N", "11,5", 6, "Par", "11,5",
+                9, "PR", "11,5", 10, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5",
+                17, "PR", "11,5", 18, "PN", "11,5", 20, "PR", "11,5", 21, "PN", "11,5",
+                24, "R", "11,5", 28, "D", "11,5", 29, "D", "11,5"
+            ]),
+            createEmployeeJS("Sautner R.", [
+                1, "D", "11,5", 2, "N", "11,5", 4, "P", "2,0", 5, "D", "11,5", 6, "D", "11,5",
+                9, "P", "11,5", 10, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5",
+                17, "PR", "11,5", 18, "PN", "11,5", 20, "PR", "11,5", 21, "PN", "11,5",
+                24, "PR", "11,5", 28, "PR", "11,5", 29, "PN", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("Kabát M.", [
+                1, "PR", "11,5", 2, "PN", "11,5", 4, "P", "2,0", 5, "PR", "11,5", 6, "PN", "11,5",
+                9, "P", "11,5", 10, "R", "11,5", 12, "N", "11,5", 16, "D", "11,5",
+                17, "D", "11,5", 20, "D", "11,5", 21, "N", "11,5", 24, "R", "11,5",
+                25, "N", "11,5", 26, "N", "11,5", 29, "N", "11,5"
+            ]),
+            createEmployeeJS("Kinčok K.", [
+                1, "PR", "11,5", 2, "PN", "11,5", 4, "P", "2,0", 5, "PR", "11,5", 6, "PN", "11,5",
+                9, "PR", "11,5", 10, "PR", "11,5", 11, "N", "11,5", 13, "PR", "11,5",
+                14, "PN", "11,5", 16, "R", "11,5", 17, "R", "11,5", 20, "R", "11,5",
+                21, "N", "11,5", 24, "R", "11,5", 28, "D", "11,5"
+            ]),
+            createEmployeeJS("Krenčan M.", [
+                2, "SR", "11,5", 3, "SN", "11,5", 4, "P", "2,0", 7, "SR", "11,5", 8, "SN", "11,5",
+                11, "P", "7,5", 12, "D", "11,5", 15, "SR", "11,5", 16, "SN", "11,5",
+                19, "SR", "11,5", 20, "SN", "11,5", 23, "SR", "11,5", 24, "SN", "11,5",
+                27, "SR", "11,5", 28, "SN", "11,5", 31, "SR", "11,5"
+            ]),
+            createEmployeeJS("Nemec M.", [
+                1, "PR", "11,5", 2, "PN", "11,5", 3, "P", "2,0", 6, "KZ", "11,5", 7, "KZ", "11,5",
+                9, "R", "11,5", 10, "R", "11,5", 11, "PN", "11,5", 15, "PR", "11,5",
+                16, "PN", "11,5", 18, "R", "11,5", 19, "N", "11,5", 21, "PR", "11,5",
+                22, "PN", "11,5", 29, "D", "11,5", 30, "D", "11,5"
+            ]),
+            createEmployeeJS("Rieger T.", [
+                1, "Par", "11,5", 2, "PN", "11,5", 3, "P", "2,0", 8, "N", "11,5",
+                10, "R", "11,5", 11, "PN", "11,5", 14, "PR", "11,5", 15, "PN", "11,5",
+                16, "N", "11,5", 18, "PR", "11,5", 19, "N", "11,5", 21, "PR", "11,5",
+                22, "PN", "11,5", 27, "N", "11,5", 29, "N", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("Lukáč Martin", [
+                1, "R", "11,5", 2, "N", "11,5", 3, "P", "2,0", 6, "PR", "11,5", 7, "PN", "11,5",
+                10, "D", "11,5", 14, "D", "11,5", 15, "N", "11,5", 16, "D", "11,5",
+                17, "KZS", "11,5", 18, "PN", "11,5", 21, "KZS", "11,5", 22, "N", "11,5",
+                26, "PR", "11,5", 27, "PN", "11,5", 29, "PR", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("Szelényi L.", [
+                1, "R", "11,5", 2, "N", "11,5", 3, "P", "2,0", 6, "PR", "11,5", 7, "PN", "11,5",
+                9, "PR", "11,5", 10, "R", "11,5", 13, "N", "11,5", 15, "R", "11,5",
+                16, "KZS", "11,5", 17, "PN", "11,5", 18, "R", "11,5", 21, "KZS", "11,5",
+                22, "N", "11,5", 25, "PR", "11,5", 26, "PN", "11,5", 29, "PR", "11,5",
+                30, "N", "11,5"
+            ]),
+            createEmployeeJS("test", [])
+        ];
+
+        const juneTopFallback = [
+            createEmployeeJS("PaedDr. Adámik M.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 11, "P", "7,5", 12, "P", "7,5",
+                15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5", 18, "P", "7,5", 19, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 25, "P", "7,5", 26, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Kovančík", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "P", "7,5",
+                8, "P", "7,5", 9, "D", "7,5", 10, "D", "7,5", 11, "D", "7,5", 12, "D", "7,5",
+                15, "D", "7,5", 16, "P", "7,5", 17, "P", "7,5", 18, "P", "7,5", 19, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 25, "P", "7,5", 26, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Kováčová R.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 11, "P", "7,5", 12, "P", "7,5",
+                15, "D", "7,5", 16, "D", "7,5", 17, "D", "7,5", 18, "D", "7,5", 19, "D", "7,5",
+                22, "D", "7,5", 23, "D", "7,5", 24, "D", "7,5", 25, "D", "7,5", 26, "D", "7,5",
+                29, "D", "7,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Adámik R.", [
+                1, "CH", "7,5", 2, "CH", "7,5", 3, "CH", "7,5", 4, "CH", "7,5", 5, "CH", "7,5",
+                8, "CH", "7,5", 9, "CH", "7,5", 10, "CH", "7,5", 11, "CH", "7,5", 12, "CH", "7,5",
+                15, "CH", "7,5", 16, "CH", "7,5", 17, "CH", "7,5", 18, "CH", "7,5", 19, "CH", "7,5",
+                22, "CH", "7,5", 23, "CH", "7,5", 24, "CH", "7,5",
+                25, "P", "7,5", 26, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Roštáš A.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "D", "7,5", 11, "D", "7,5", 12, "D", "7,5",
+                15, "D", "7,5", 16, "P", "7,5", 17, "P", "7,5", 18, "P", "7,5", 19, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 25, "SR", "11,5", 26, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Peťko M.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "D", "7,5", 11, "D", "7,5", 12, "D", "7,5",
+                15, "D", "7,5", 16, "SR", "11,5", 17, "P", "7,5", 18, "P", "7,5", 19, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 25, "P", "7,5", 26, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Šebelédy", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 11, "P", "7,5", 12, "P", "7,5",
+                15, "SR", "11,5", 16, "P", "7,5", 17, "P", "7,5", 18, "P", "7,5", 19, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 25, "P", "7,5", 26, "SR", "11,5",
+                29, "P", "7,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Töröková", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "SR", "11,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 11, "P", "7,5", 12, "P", "7,5",
+                15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5", 18, "P", "7,5", 19, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 25, "P", "7,5", 26, "P", "7,5",
+                29, "SR", "11,5", 30, "P", "7,5"
+            ]),
+            createEmployeeJS("Bielik R.", [
+                1, "SR", "11,5", 2, "SN", "11,5", 3, "P", "2,0", 5, "SN", "11,5",
+                9, "SR", "11,5", 10, "SN", "11,5", 13, "SR", "11,5", 14, "SN", "11,5",
+                17, "SR", "11,5", 18, "SN", "11,5", 19, "V", "5,0", 21, "SR", "11,5",
+                22, "SN", "11,5", 25, "SR", "11,5", 26, "SN", "11,5", 29, "SR", "11,5",
+                30, "SN", "11,5"
+            ]),
+            createEmployeeJS("Fábry J.", [
+                1, "R", "11,5", 2, "N", "11,5", 3, "P", "2,0", 4, "PR", "11,5", 5, "PN", "11,5",
+                9, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5", 17, "R", "11,5", 18, "N", "11,5",
+                19, "V", "5,0", 21, "PR", "11,5", 22, "N", "11,5", 25, "D", "11,5", 26, "N", "11,5",
+                29, "PR", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("Kazár D.", [
+                1, "R", "11,5", 2, "N", "11,5", 3, "P", "2,0", 5, "PR", "11,5", 6, "PN", "11,5",
+                9, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5", 17, "R", "11,5", 18, "N", "11,5",
+                19, "V", "5,0", 21, "PR", "11,5", 22, "PN", "11,5", 25, "PR", "11,5", 26, "PN", "11,5",
+                29, "PR", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("PhDr. Kabát", [
+                1, "PR", "11,5", 2, "PN", "11,5", 3, "P", "2,0", 4, "D", "11,5", 5, "D", "11,5", 6, "D", "11,5",
+                9, "R", "11,5", 10, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5", 15, "D", "11,5", 16, "D", "11,5",
+                17, "PR", "11,5", 18, "PN", "11,5", 19, "V", "5,0", 21, "D", "11,5", 25, "PR", "11,5", 26, "PN", "11,5",
+                29, "R", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("Oberfranc R.", [
+                1, "PR", "11,5", 2, "PN", "11,5", 3, "P", "2,0", 5, "R", "11,5", 6, "N", "11,5",
+                9, "R", "11,5", 10, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5", 17, "PR", "11,5", 18, "PN", "11,5",
+                19, "V", "5,0", 21, "R", "11,5", 22, "N", "11,5", 25, "PR", "11,5", 26, "PN", "11,5",
+                29, "R", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("Polyák A.", [
+                2, "R", "11,5", 3, "P", "2,0", 4, "D", "11,5", 5, "D", "11,5", 6, "PR", "11,5", 7, "PN", "11,5",
+                10, "R", "11,5", 11, "N", "11,5", 12, "D", "11,5", 13, "D", "11,5", 14, "PR", "11,5", 15, "PN", "11,5",
+                18, "R", "11,5", 19, "V", "5,0", 22, "PR", "11,5", 23, "PN", "11,5", 26, "R", "11,5", 27, "N", "11,5",
+                30, "PR", "11,5"
+            ]),
+            createEmployeeJS("Bc. Petráš A.", [
+                2, "R", "11,5", 3, "P", "2,0", 4, "D", "11,5", 5, "D", "11,5", 6, "PR", "11,5", 7, "PN", "11,5",
+                10, "R", "11,5", 11, "N", "11,5", 12, "D", "11,5", 13, "D", "11,5", 14, "PR", "11,5", 15, "PN", "11,5",
+                18, "R", "11,5", 19, "V", "5,0", 22, "PR", "11,5", 23, "PN", "11,5", 26, "R", "11,5", 27, "N", "11,5",
+                30, "PR", "11,5"
+            ]),
+            createEmployeeJS("Bc. Kelo R.", [
+                3, "SR", "11,5", 4, "SN", "11,5", 3, "P", "2,0", 5, "D", "11,5", 6, "D", "11,5", 7, "D", "11,5", 8, "D", "11,5",
+                11, "D", "11,5", 12, "D", "11,5", 15, "SR", "11,5", 16, "SN", "11,5", 19, "V", "5,0",
+                23, "SR", "11,5", 24, "SN", "11,5", 27, "SR", "11,5", 28, "SN", "11,5"
+            ]),
+            createEmployeeJS("Sautner R.", [
+                3, "SR", "11,5", 4, "SN", "11,5", 3, "P", "2,0", 5, "D", "11,5", 6, "D", "11,5", 7, "D", "11,5", 8, "D", "11,5",
+                11, "D", "11,5", 12, "D", "11,5", 15, "SR", "11,5", 16, "SN", "11,5", 19, "V", "5,0",
+                23, "SR", "11,5", 24, "SN", "11,5", 27, "SR", "11,5", 28, "SN", "11,5"
+            ]),
+            createEmployeeJS("Andruška Z.", [
+                1, "D", "11,5", 2, "D", "11,5", 3, "P", "2,0", 4, "R", "11,5", 5, "N", "11,5", 6, "D", "11,5",
+                8, "PR", "11,5", 9, "PN", "11,5", 12, "R", "11,5", 13, "N", "11,5", 16, "PR", "11,5", 17, "PN", "11,5",
+                18, "R", "11,5", 19, "V", "5,0", 20, "PR", "11,5", 21, "PN", "11,5", 24, "R", "11,5", 25, "N", "11,5",
+                28, "PR", "11,5", 29, "PN", "11,5"
+            ]),
+            createEmployeeJS("Bc. Masaryk", [
+                1, "PR", "11,5", 2, "PN", "11,5", 3, "P", "2,0", 5, "PR", "11,5", 6, "PN", "11,5",
+                9, "R", "11,5", 10, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5", 17, "PR", "11,5", 18, "PN", "11,5",
+                19, "V", "5,0", 21, "R", "11,5", 22, "N", "11,5", 24, "D", "11,5", 25, "D", "11,5", 29, "D", "11,5",
+                30, "PN", "11,5"
+            ]),
+            createEmployeeJS("Šovčík M.", [
+                1, "PR", "11,5", 2, "PN", "11,5", 3, "P", "2,0", 5, "PR", "11,5", 6, "PN", "11,5",
+                9, "R", "11,5", 10, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5", 17, "PR", "11,5", 18, "PN", "11,5",
+                19, "V", "5,0", 21, "R", "11,5", 22, "N", "11,5", 24, "D", "11,5", 25, "D", "11,5", 29, "D", "11,5",
+                30, "PN", "11,5"
+            ])
+        ];
+
+        const juneBottomFallback = [
+            createEmployeeJS("Bc. Obert L.", [
+                2, "SR", "11,5", 3, "SN", "13,5", 6, "SR", "11,5", 7, "SN", "11,5",
+                10, "SR", "11,5", 11, "SN", "11,5", 14, "SR", "11,5", 15, "SN", "11,5",
+                18, "SR", "11,5", 19, "V", "5,0", 21, "D", "11,5", 22, "SR", "11,5",
+                23, "SN", "11,5", 26, "SR", "11,5", 27, "SN", "11,5", 28, "D", "11,5",
+                30, "SR", "11,5"
+            ]),
+            createEmployeeJS("Adámik P.", [
+                2, "SR", "11,5", 3, "SN", "13,5", 6, "SR", "11,5", 7, "SN", "11,5",
+                10, "SR", "11,5", 11, "SN", "11,5", 13, "D", "11,5", 14, "SR", "11,5",
+                15, "SN", "11,5", 18, "SR", "11,5", 19, "V", "5,0", 21, "D", "11,5",
+                22, "SR", "11,5", 23, "SN", "11,5", 26, "SR", "11,5", 27, "SN", "11,5",
+                28, "D", "11,5", 30, "SR", "11,5"
+            ]),
+            createEmployeeJS("Gacs Š.", [
+                2, "SR", "11,5", 3, "SN", "13,5", 6, "SR", "11,5", 7, "SN", "11,5",
+                10, "SR", "11,5", 11, "SN", "11,5", 14, "SR", "11,5", 15, "SN", "11,5",
+                18, "SR", "11,5", 19, "V", "5,0", 21, "D", "11,5", 22, "SR", "11,5",
+                23, "SN", "11,5", 26, "SR", "11,5", 27, "SN", "11,5", 28, "D", "11,5",
+                30, "SR", "11,5"
+            ]),
+            createEmployeeJS("Kabát M.", [
+                3, "PR", "11,5", 4, "PN", "11,5", 7, "PR", "11,5", 8, "D", "11,5",
+                11, "PR", "11,5", 12, "PN", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "V", "5,0", 20, "PR", "11,5", 21, "PN", "11,5", 22, "D", "11,5",
+                24, "PR", "11,5", 25, "PN", "11,5", 26, "D", "11,5", 28, "PR", "11,5",
+                29, "PN", "11,5"
+            ]),
+            createEmployeeJS("Kinčok K.", [
+                3, "PR", "11,5", 4, "PN", "11,5", 7, "PR", "11,5", 8, "D", "11,5",
+                11, "PR", "11,5", 12, "PN", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "V", "5,0", 20, "PR", "11,5", 21, "PN", "11,5", 22, "D", "11,5",
+                24, "PR", "11,5", 25, "PN", "11,5", 26, "D", "11,5", 28, "PR", "11,5",
+                29, "PN", "11,5"
+            ]),
+            createEmployeeJS("Bc. Bariš D.", [
+                3, "PR", "11,5", 4, "PN", "11,5", 7, "PR", "11,5", 8, "D", "11,5",
+                11, "PR", "11,5", 12, "PN", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "V", "5,0", 20, "PR", "11,5", 21, "PN", "11,5", 22, "D", "11,5",
+                24, "PR", "11,5", 25, "PN", "11,5", 26, "D", "11,5", 28, "PR", "11,5",
+                29, "PN", "11,5"
+            ]),
+            createEmployeeJS("Mgr. Krenčan", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 4, "P", "7,5", 5, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 11, "P", "7,5", 12, "P", "7,5",
+                15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5", 18, "P", "7,5", 19, "V", "5,0",
+                21, "SR", "11,5", 22, "P", "7,5", 23, "D", "7,5", 24, "D", "7,5", 25, "D", "7,5",
+                26, "P", "7,5", 29, "D", "7,5", 30, "D", "7,5"
+            ]),
+            createEmployeeJS("Krenčan M.", [
+                1, "SN", "11,5", 4, "SR", "11,5", 5, "SN", "11,5", 8, "SR", "11,5", 9, "SN", "11,5",
+                12, "D", "11,5", 13, "SN", "11,5", 16, "SR", "11,5", 17, "SN", "11,5", 19, "V", "5,0",
+                20, "SR", "11,5", 21, "SN", "11,5", 24, "D", "11,5", 25, "SN", "11,5", 28, "D", "11,5",
+                29, "SN", "11,5"
+            ]),
+            createEmployeeJS("Nemec M.", [
+                1, "SN", "11,5", 4, "SR", "11,5", 5, "SN", "11,5", 8, "SR", "11,5", 9, "SN", "11,5",
+                12, "D", "11,5", 13, "SN", "11,5", 16, "SR", "11,5", 17, "SN", "11,5", 19, "V", "5,0",
+                20, "SR", "11,5", 21, "SN", "11,5", 24, "D", "11,5", 25, "SN", "11,5", 28, "D", "11,5",
+                29, "SN", "11,5"
+            ]),
+            createEmployeeJS("Rieger T.", [
+                1, "SN", "11,5", 4, "SR", "11,5", 5, "SN", "11,5", 8, "SR", "11,5", 9, "SN", "11,5",
+                12, "D", "11,5", 13, "SN", "11,5", 16, "SR", "11,5", 17, "SN", "11,5", 19, "V", "5,0",
+                20, "SR", "11,5", 21, "SN", "11,5", 24, "D", "11,5", 25, "SN", "11,5", 28, "D", "11,5",
+                29, "SN", "11,5"
+            ]),
+            createEmployeeJS("Lukáč Martin", [
+                1, "SN", "11,5", 4, "SR", "11,5", 5, "SN", "11,5", 8, "SR", "11,5", 9, "SN", "11,5",
+                12, "D", "11,5", 13, "SN", "11,5", 16, "SR", "11,5", 17, "SN", "11,5", 19, "V", "5,0",
+                20, "SR", "11,5", 21, "SN", "11,5", 24, "D", "11,5", 25, "SN", "11,5", 28, "D", "11,5",
+                29, "SN", "11,5"
+            ]),
+            createEmployeeJS("Szelényi L.", [
+                1, "SN", "11,5", 4, "SR", "11,5", 5, "SN", "11,5", 8, "SR", "11,5", 9, "SN", "11,5",
+                12, "D", "11,5", 13, "SN", "11,5", 16, "SR", "11,5", 17, "SN", "11,5", 19, "V", "5,0",
+                20, "SR", "11,5", 21, "SN", "11,5", 24, "D", "11,5", 25, "SN", "11,5", 28, "D", "11,5",
+                29, "SN", "11,5"
+            ])
+        ];
+
+        // State Store
+        window.activeMonthIndex = getCurrentRosterMonthIndex(); // Jan 2026 default or current dynamic month
+        window.activeRoster = {
+            published: false,
+            topEmployees: [],
+            bottomEmployees: []
+        };
+        window.hasUnsavedChanges = false;
+
+        // Modal triggers properties representation
+        window.selectedTargetCell = null; // { group: 'top'/'bottom', empIdx: 0, day: 1 }
+
+        // Role-based state variables
+        window.currentUserRole = 'admin'; // 'admin', 'poverena', 'zamestnanec'
+        window.currentEmployeeName = '';
+        window.canEdit = true;
+
+        window.getShiftDesc = function(code, isDailyGroup) {
+            if (!code) return "Voľný deň / Sviatok";
+            switch(code.trim().toUpperCase()) {
+                case 'R': return "Ranná smena (7,5 hod)";
+                case 'SR': return "Služobná ranná služba (11,5 hod)";
+                case 'SN': return "Služobná nočná služba (11,5 hod)";
+                case 'N': return "Nočná smena (11,5 hod)";
+                case 'D': return "Riadna dovolenka";
+                case 'CH': return "OČR / Sprevádzanie chorého";
+                case 'PN': return "Práce neschopnosť (Maródka)";
+                case 'PAR': return "Paragraf (Osobné voľno)";
+                case 'P': return isDailyGroup ? "Ranná služba (7,5 hod)" : "Porada (P)";
+                default: return "Služba " + code;
+            }
+        };
+
+        window.isDailyGroupEmployee = function(employeeName) {
+            if (!employeeName) return false;
+            const topList = window.activeRoster?.topEmployees || [];
+            const bottomList = window.activeRoster?.bottomEmployees || [];
+            const combined = [...topList, ...bottomList];
+            
+            const firstLeaderIdx = combined.findIndex(emp => {
+                const nameLower = (emp.name || "").toLowerCase();
+                const nameNoAccents = nameLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return nameLower.includes("bielik") ||
+                       nameLower.includes("kelo") ||
+                       ((nameLower.includes("krenčan") || nameNoAccents.includes("krencan")) && !nameLower.includes("mgr")) ||
+                       (nameLower.includes("obert") && !nameLower.includes("oberfranc"));
+            });
+            
+            if (firstLeaderIdx < 0) return true;
+            const myIndex = combined.findIndex(e => (e.name || "").trim().toLowerCase() === employeeName.trim().toLowerCase());
+            return myIndex >= 0 && myIndex < firstLeaderIdx;
+        };
+
+        /*
+                g-red-950/20 border border-red-900/40 rounded-2xl px-4 py-3 text-red-300 max-w-[85%] leading-relaxed">
+                        Došlo k chybe pri analýze obrázku pomocou Gemini API: \${err.message}. Overte kľúč a skúste to znovu.
+                    </div>
+                `;
+                messagesContainer.appendChild(aiErrorDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        };
+        */
+
+        window.onLoginStateChanged = function() {
+            const isLoggedIn = localStorage.getItem('is_logged_in') === 'true';
+            if (!isLoggedIn) {
+                const overlay = document.getElementById('login-overlay');
+                if (overlay) overlay.classList.remove('hidden');
+                return;
+            }
+            
+            const username = localStorage.getItem('logged_in_user_name') || 'admin';
+            
+            // Map username back to role
+            if (username === 'admin') {
+                window.currentUserRole = 'admin';
+                window.currentEmployeeName = '';
+                window.canEdit = true;
+            } else if (username.toLowerCase() === 'riegert' || username.toLowerCase() === 'rieger t.') {
+                window.currentUserRole = 'poverena';
+                window.currentEmployeeName = 'Rieger T.';
+                window.canEdit = true;
+            } else if (username === 'test') {
+                window.currentUserRole = 'zamestnanec';
+                window.currentEmployeeName = 'test';
+                window.canEdit = false;
+            } else {
+                window.currentUserRole = 'zamestnanec';
+                window.currentEmployeeName = username;
+                window.canEdit = false;
+            }
+            
+            // Hide overlay
+            const overlay = document.getElementById('login-overlay');
+            if (overlay) overlay.classList.add('hidden');
+            
+            // Update user profile badges on page
+            const pName = document.getElementById('profile-display-name');
+            const pBadge = document.getElementById('profile-display-badge');
+            const highlightBox = document.getElementById('logged-highlight-box');
+            
+            if (pName && pBadge) {
+                pName.innerText = window.currentUserRole === 'admin' ? 'Administrátor' : window.currentEmployeeName;
+                
+                if (window.currentUserRole === 'admin') {
+                    pBadge.innerText = 'Administrátor';
+                    pBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-600 text-white animate-pulse";
+                } else if (window.currentUserRole === 'poverena') {
+                    pBadge.innerText = 'Poverená osoba';
+                    pBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-600 text-white";
+                } else {
+                    pBadge.innerText = 'Zamestnanec';
+                    pBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-600 text-white";
+                }
+            }
+            if (highlightBox) {
+                if (window.currentUserRole === 'zamestnanec' && window.currentEmployeeName !== 'test') {
+                    highlightBox.classList.remove('hidden');
+                } else {
+                    highlightBox.classList.add('hidden');
+                }
+            }
+            
+            // Set hidden dummy inputs to match potential DOM selector legacy dependencies
+            const rs = document.getElementById('role-selector');
+            if (rs) rs.value = window.currentUserRole;
+            const es = document.getElementById('emp-selector');
+            if (es) es.value = window.currentEmployeeName;
+            
+            // Refresh grid and show/hide admin parts
+            renderRosterUI();
+            updateUIControlsBasedOnRole();
+
+            // Setup real-time messaging listeners for the new user profile
+            if (window.firebaseConnected && window.firestoreDb) {
+                try {
+                    window.listenToTargetedMessages();
+                    if (window.currentUserRole === 'admin' || window.currentUserRole === 'poverena') {
+                        window.listenToSentMessagesAdmin();
+                    }
+                } catch(msgErr) {
+                    console.warn("Failed to restart messaging listener upon login:", msgErr);
+                }
+            }
+        };
+
+        window.onRoleChanged = function() {
+            window.onLoginStateChanged();
+        };
+
+        window.logoutCurrentUser = function() {
+            localStorage.removeItem('is_logged_in');
+            localStorage.removeItem('logged_in_user_name');
+            window.currentUserRole = 'zamestnanec';
+            window.currentEmployeeName = '';
+            window.canEdit = false;
+            
+            // Clear passwords input
+            document.getElementById('login-password').value = '';
+            document.getElementById('login-username').value = '';
+            
+            // Show login overlay
+            const overlay = document.getElementById('login-overlay');
+            if (overlay) overlay.classList.remove('hidden');
+            window.onLoginStateChanged();
+        };
+
+        window.togglePasswordVisibility = function() {
+            const input = document.getElementById('login-password');
+            const icon = document.getElementById('password-visibility-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.innerText = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.innerText = 'visibility';
+            }
+        };
+
+        window.onLoginUsernameChanged = function() {
+            const username = document.getElementById('login-username').value.trim();
+            const emailSection = document.getElementById('login-email-section');
+            const passLabel = document.getElementById('login-pass-label');
+            const passInput = document.getElementById('login-password');
+            
+            const isRiegerT = username.toLowerCase() === 'riegert' || username.toLowerCase() === 'rieger t.';
+            const isAdmin = username.toLowerCase() === 'admin';
+            const isTest = username.toLowerCase() === 'test';
+            
+            const topNames = (window.activeRoster?.topEmployees || []).map(e => e.name);
+            const bottomNames = (window.activeRoster?.bottomEmployees || []).map(e => e.name);
+            const allNames = [...topNames, ...bottomNames];
+            const isNameInRoster = allNames.some(name => name.trim().toLowerCase() === username.toLowerCase());
+            
+            const isSpecialUser = isRiegerT || isAdmin || isTest;
+            const showEmailOption = isNameInRoster && !isSpecialUser;
+            
+            if (showEmailOption) {
+                if (emailSection) emailSection.classList.remove('hidden');
+                if (passLabel) passLabel.innerText = 'Prístupový kód';
+                if (passInput) passInput.placeholder = 'Zadajte kód';
+            } else {
+                if (emailSection) emailSection.classList.add('hidden');
+                if (passLabel) passLabel.innerText = 'Heslo';
+                if (passInput) passInput.placeholder = 'Zadajte heslo';
+            }
+        };
+
+        window.sendWebEmailCode = function() {
+            const username = document.getElementById('login-username').value.trim();
+            const email = document.getElementById('login-email').value.trim();
+            const errorEl = document.getElementById('login-error-message');
+            
+            if (!email || !email.includes('@')) {
+                errorEl.innerText = 'Zadajte platnú e-mailovú adresu.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            
+            errorEl.classList.add('hidden');
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            localStorage.setItem('roster_login_password', code);
+            
+            document.getElementById('sent-code-email-label').innerText = email;
+            document.getElementById('sent-code-value').innerText = code;
+            document.getElementById('sent-code-modal').classList.remove('hidden');
+        };
+
+        window.closeSentCodeModal = function() {
+            document.getElementById('sent-code-modal').classList.add('hidden');
+        };
+
+        window.submitWebLogin = function() {
+            const username = document.getElementById('login-username').value.trim();
+            const passwordInput = document.getElementById('login-password').value.trim();
+            const errorEl = document.getElementById('login-error-message');
+            
+            if (!username) {
+                errorEl.innerText = 'Najprv zadajte meno.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            
+            const topNames = (window.activeRoster?.topEmployees || []).map(e => e.name);
+            const bottomNames = (window.activeRoster?.bottomEmployees || []).map(e => e.name);
+            const allNames = [...topNames, ...bottomNames];
+            
+            const isRiegerT = username.toLowerCase() === 'riegert' || username.toLowerCase() === 'rieger t.';
+            const isAdmin = username.toLowerCase() === 'admin';
+            const isTest = username.toLowerCase() === 'test';
+            
+            if (isRiegerT) {
+                if (passwordInput === '745325') {
+                    const finalName = allNames.find(n => n.toLowerCase().includes('rieger')) || 'Rieger T.';
+                    loginUserSession(finalName, 'poverena');
+                } else {
+                    errorEl.innerText = 'Nesprávne heslo pre RiegerT.';
+                    errorEl.classList.remove('hidden');
+                }
+            } else if (isAdmin) {
+                if (passwordInput === 'admin') {
+                    loginUserSession('admin', 'admin');
+                } else {
+                    errorEl.innerText = 'Nesprávne heslo pre admina.';
+                    errorEl.classList.remove('hidden');
+                }
+            } else if (isTest) {
+                if (passwordInput === 'test') {
+                    loginUserSession('test', 'zamestnanec');
+                } else {
+                    errorEl.innerText = 'Nesprávne heslo pre test.';
+                    errorEl.classList.remove('hidden');
+                }
+            } else {
+                const matchedEmployee = allNames.find(n => n.trim().toLowerCase() === username.toLowerCase());
+                if (!matchedEmployee) {
+                    errorEl.innerText = 'Zadané meno sa v rozpise nenachádza.';
+                    errorEl.classList.remove('hidden');
+                } else {
+                    const savedPassword = localStorage.getItem('roster_login_password') || '';
+                    if (passwordInput === savedPassword && passwordInput !== '') {
+                        loginUserSession(matchedEmployee, 'zamestnanec');
+                    } else {
+                        errorEl.innerText = `Nesprávny prístupový kód pre používateľa ${matchedEmployee}.`;
+                        errorEl.classList.remove('hidden');
+                    }
+                }
+            }
+        };
+
+        function loginUserSession(username, role) {
+            localStorage.setItem('is_logged_in', 'true');
+            localStorage.setItem('logged_in_user_name', username);
+            
+            window.currentUserRole = role;
+            if (role === 'zamestnanec') {
+                window.currentEmployeeName = username;
+                window.canEdit = false;
+            } else {
+                window.currentEmployeeName = username === 'admin' ? '' : username;
+                window.canEdit = true;
+            }
+            
+            const overlay = document.getElementById('login-overlay');
+            if (overlay) overlay.classList.add('hidden');
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
+            document.getElementById('login-error-message').classList.add('hidden');
+            
+            window.onLoginStateChanged();
+        }
+
+        window.openForgotPasswordDialog = function() {
+            document.getElementById('forgot-username').value = '';
+            document.getElementById('forgot-email-address').value = '';
+            document.getElementById('forgot-error').classList.add('hidden');
+            document.getElementById('forgot-success-text').classList.add('hidden');
+            document.getElementById('forgot-submit-btn').classList.remove('hidden');
+            document.getElementById('forgot-password-modal').classList.remove('hidden');
+        };
+
+        window.closeForgotPasswordDialog = function() {
+            document.getElementById('forgot-password-modal').classList.add('hidden');
+        };
+
+        window.submitForgotPasswordWeb = function() {
+            const username = document.getElementById('forgot-username').value.trim();
+            const email = document.getElementById('forgot-email-address').value.trim();
+            const errorEl = document.getElementById('forgot-error');
+            const successEl = document.getElementById('forgot-success-text');
+            
+            if (!username) {
+                errorEl.innerText = 'Najprv zadajte meno.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            if (!email || !email.includes('@')) {
+                errorEl.innerText = 'Zadajte platnú e-mailovú adresu.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            
+            const topNames = (window.activeRoster?.topEmployees || []).map(e => e.name);
+            const bottomNames = (window.activeRoster?.bottomEmployees || []).map(e => e.name);
+            const allNames = [...topNames, ...bottomNames];
+            
+            const isRiegerT = username.toLowerCase() === 'riegert' || username.toLowerCase() === 'rieger t.';
+            const isAdmin = username.toLowerCase() === 'admin';
+            const isTest = username.toLowerCase() === 'test';
+            const isFound = isRiegerT || isAdmin || isTest || allNames.some(n => n.trim().toLowerCase() === username.toLowerCase());
+            
+            if (!isFound) {
+                errorEl.innerText = 'Zadané meno sa v rozpise nenachádza.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            
+            errorEl.classList.add('hidden');
+            
+            let newPass = '';
+            if (isAdmin) {
+                newPass = 'admin';
+            } else if (isRiegerT) {
+                newPass = '745325';
+            } else {
+                newPass = Math.floor(100000 + Math.random() * 900000).toString();
+                localStorage.setItem('roster_login_password', newPass);
+            }
+            
+            successEl.innerHTML = `Nové heslo bolo vygenerované na e-mail: <strong class="text-white">${email}</strong>.<br><br>Heslo/Kód: <span class="text-lg font-black text-brand-primary tracking-widest">${newPass}</span>`;
+            successEl.classList.remove('hidden');
+            document.getElementById('forgot-submit-btn').classList.add('hidden');
+        };
+
+        window.updateUIControlsBasedOnRole = function() {
+            const adminButtons = document.querySelectorAll('.admin-only');
+            const employeeBanner = document.getElementById('employee-view-banner');
+            
+            if (window.canEdit) {
+                // If admin power, show everything
+                adminButtons.forEach(btn => btn.classList.remove('hidden'));
+                employeeBanner.classList.add('hidden');
+            } else {
+                // Hide admins controls, show read-only employee notice
+                adminButtons.forEach(btn => btn.classList.add('hidden'));
+                employeeBanner.classList.remove('hidden');
+                
+                if (window.currentEmployeeName) {
+                    document.getElementById('logged-employee-name-notice').innerText = window.currentEmployeeName;
+                } else {
+                    document.getElementById('logged-employee-name-notice').innerText = "Všetci";
+                }
+            }
+
+            // Show config section and database docs only for the 'admin' role
+            const configSection = document.getElementById('firebase-config-section');
+            const dbDocsSection = document.getElementById('db-docs');
+            if (window.currentUserRole === 'admin') {
+                if (configSection) configSection.classList.remove('hidden');
+                if (dbDocsSection) dbDocsSection.classList.remove('hidden');
+            } else {
+                if (configSection) configSection.classList.add('hidden');
+                if (dbDocsSection) dbDocsSection.classList.add('hidden');
+            }
+
+
+        };
+
+        window.populateEmployeeSelector = function() {
+            const selectEl = document.getElementById('emp-selector');
+            if (!selectEl) return;
+            const currentSelected = selectEl.value;
+            let options = '';
+            
+            // Collect all unique names from top and bottom
+            const topNames = window.activeRoster.topEmployees.map(e => e.name);
+            const bottomNames = window.activeRoster.bottomEmployees.map(e => e.name);
+            const allNames = [...topNames, ...bottomNames];
+            
+            allNames.forEach(name => {
+                options += `<option value="${name}" ${name === currentSelected ? 'selected' : ''}>${name}</option>`;
+            });
+            
+            selectEl.innerHTML = options;
+        };
+
+        window.executeMoveOrCopyShift = function(deleteSource) {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            if (!window.selectedTargetCell) return;
+            const { group, empIdx, day } = window.selectedTargetCell;
+            const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
+            const emp = list[empIdx];
+            const sourceCell = emp.shifts[day] || { code: null, hours: null };
+            
+            const targetDay = parseInt(document.getElementById('modal-move-target-day').value, 10);
+            if (targetDay === day) {
+                alert("Nemožno kopírovať/presunúť službu na ten istý deň!");
+                return;
+            }
+            
+            // Check if source cell has any shift code
+            if (!sourceCell.code) {
+                alert("Vybraný zdrojový deň nemá žiadnu zadefinovanú službu na kopírovanie/presun!");
+                return;
+            }
+            
+            // Perform copy / move
+            emp.shifts[targetDay] = {
+                day: targetDay,
+                code: sourceCell.code,
+                hours: sourceCell.hours
+            };
+            
+            if (deleteSource) {
+                emp.shifts[day] = {
+                    day: day,
+                    code: null,
+                    hours: null
+                };
+            }
+            
+            alert(`Služba bola úspešne ${deleteSource ? "presunutá" : "skopírovaná"} na deň ${targetDay}.`);
+            
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+
+            closeEditModal();
+            renderRosterUI();
+        };
+
+        window.moveEmployee = function(group, idx, direction) {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
+            const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+            
+            if (targetIdx < 0 || targetIdx >= list.length) return; // Boundary check
+            
+            // Swap elements
+            const temp = list[idx];
+            list[idx] = list[targetIdx];
+            list[targetIdx] = temp;
+            
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+
+            renderRosterUI();
+        };
+
+        // Setup hook functions on global window object so standard button elements can trigger them
+        window.initializeFirebaseApp = function() {
+            const config = {
+                apiKey: document.getElementById('firebase-apiKey').value.trim(),
+                authDomain: document.getElementById('firebase-authDomain').value.trim(),
+                projectId: document.getElementById('firebase-projectId').value.trim(),
+                storageBucket: document.getElementById('firebase-storageBucket').value.trim(),
+                messagingSenderId: document.getElementById('firebase-messagingSenderId').value.trim(),
+                appId: document.getElementById('firebase-appId').value.trim()
+            };
+
+            if (!config.apiKey || !config.projectId) {
+                alert("Prosím zadajte aspoň API Key a Project ID pre inicializáciu pripojenia!");
+                return;
+            }
+
+            try {
+                window.firebaseApp = initializeApp(config);
+                window.firestoreDb = getFirestore(window.firebaseApp);
+                window.firebaseConnected = true;
+
+                // Save if checkbox checked
+                if (document.getElementById('remember-config').checked) {
+                    localStorage.setItem('firebase_config', JSON.stringify(config));
+                }
+
+                // Update indicators
+                const badge = document.getElementById('connection-badge');
+                badge.className = "flex items-center gap-2 bg-emerald-950/40 text-emerald-400 border border-emerald-900 px-3.5 py-2 rounded-lg text-sm font-medium";
+                badge.innerHTML = `<span class="h-2 w-2 rounded-full bg-emerald-500"></span> Pripojený k Firebase`;
+                
+                document.getElementById('firebase-status-banner').classList.remove('hidden');
+
+                // Try automatic read
+                loadRosterFromFirestore();
+
+                // Real-time messages monitoring listeners!
+                try {
+                    window.listenToTargetedMessages();
+                    if (window.currentUserRole === 'admin' || window.currentUserRole === 'poverena') {
+                        window.listenToSentMessagesAdmin();
+                    }
+                } catch(msgErr) {
+                    console.warn("Failed to start messaging listener upon initialize:", msgErr);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Zlyhala konfigurácia Firebase: " + e.message);
+            }
+        };
+
+        // Read monthly roster from Firestore
+        window.loadRosterFromFirestore = async function() {
+            if (!window.firebaseConnected || !window.firestoreDb) {
+                alert("Nie ste pripojený k Firebase. Načítavajú sa lokálne záložné dáta.");
+                loadRosterFallback();
+                return;
+            }
+
+            const monthDocId = `month_2026_${String(window.activeMonthIndex).padStart(2, '0')}`;
+            try {
+                const rosterRef = doc(window.firestoreDb, "rosters", monthDocId);
+                const rosterSnap = await getDoc(rosterRef);
+
+                if (rosterSnap.exists()) {
+                    const data = rosterSnap.data();
+                    window.activeRoster.published = data.published || false;
+                    
+                    // Fetch top & bottom arrays directly if stored inside root document, or fallbacks if empty
+                    window.activeRoster.topEmployees = data.topEmployees || [];
+                    window.activeRoster.bottomEmployees = data.bottomEmployees || [];
+                    
+                    window.hasUnsavedChanges = false;
+                    window.updatePublishUI();
+                } else {
+                    console.log("Mesiac " + monthDocId + " nebol nájdený, načítavajú sa predvolené hodnoty.");
+                    loadRosterFallback();
+                }
+                renderRosterUI();
+            } catch (e) {
+                console.error(e);
+                alert("Nepodarilo sa stiahnuť rozpis z Firestore: " + e.message);
+                loadRosterFallback();
+            }
+        };
+
+        // Save roster payload to Firestore
+        window.saveRosterToFirestore = async function() {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Ukladanie zmien v minulých mesiacoch nie je povolené!");
+                return;
+            }
+            if (!window.firebaseConnected || !window.firestoreDb) {
+                alert("Na zapísanie zmien musíte najprv inicializovať pripojenie k Firebase!");
+                return;
+            }
+
+            // Clicking Zverejniť Rozpis automatically publishes the roster
+            window.activeRoster.published = true;
+
+            const monthDocId = `month_2026_${String(window.activeMonthIndex).padStart(2, '0')}`;
+            const btnSave = document.getElementById('btn-save-remote');
+            btnSave.disabled = true;
+            btnSave.innerText = "Ukladanie...";
+
+            try {
+                const rosterRef = doc(window.firestoreDb, "rosters", monthDocId);
+                
+                await setDoc(rosterRef, {
+                    monthIndex: window.activeMonthIndex,
+                    year: 2026,
+                    month: window.activeMonthIndex,
+                    published: window.activeRoster.published,
+                    lastUpdated: new Date().toISOString(),
+                    topEmployees: window.activeRoster.topEmployees,
+                    bottomEmployees: window.activeRoster.bottomEmployees
+                }, { merge: true });
+
+                // Vytvoriť požiadavku na push notifikáciu pre tému roster_updates
+                try {
+                    const requestRef = doc(collection(window.firestoreDb, "fcm_requests"));
+                    const monthName = getSlovakMonthName(window.activeMonthIndex);
+                    const yearText = window.activeMonthIndex === 0 ? "2025" : "2026";
+                    await setDoc(requestRef, {
+                        title: "Aktualizácia rozpisu",
+                        body: `Bol upravený rozpis pre mesiac ${monthName} ${yearText}. Ak sa vás to týka, zmeny sa prenesú do kalendára.`,
+                        topic: "roster_updates",
+                        createdAt: new Date().toISOString(),
+                        status: "pending"
+                    });
+                    console.log("FCM push request registered successfully from web client.");
+                } catch (fcmErr) {
+                    console.warn("Failed to generate fcm_request doc, but roster was saved:", fcmErr);
+                }
+
+                window.hasUnsavedChanges = false;
+                window.updatePublishUI();
+                alert("Rozpis úspešne uložený a zverejnený!");
+            } catch (e) {
+                console.error(e);
+                alert("Zlyhalo ukladanie do Firestore: " + e.message);
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = `<span class="material-symbols-outlined text-lg">public</span> Zverejniť Rozpis`;
+            }
+        };
+
+        // Queue a FCM Push request to Google Firebase
+        window.sendPushNotificationRequest = async function() {
+            if (!window.firebaseConnected || !window.firestoreDb) {
+                alert("Pripojte sa najskôr k Firebase pre odoslanie výzvy!");
+                return;
+            }
+
+            const title = document.getElementById('push-title').value.trim();
+            const body = document.getElementById('push-body').value.trim();
+            
+            if (!title || !body) {
+                alert("Zadajte prosím nadpis a obsah push notifikácie.");
+                return;
+            }
+
+            const btnSend = document.getElementById('btn-send-push');
+            btnSend.disabled = true;
+            btnSend.innerText = "Odosielanie požiadavky...";
+
+            try {
+                // Generate a random push request document inside fcm_requests
+                const requestRef = doc(collection(window.firestoreDb, "fcm_requests"));
+                await setDoc(requestRef, {
+                    title: title,
+                    body: body,
+                    topic: "roster_updates",
+                    createdAt: new Date().toISOString(),
+                    status: "pending"
+                });
+
+                alert("Super! Požiadavka bola úspešne zapísaná do kolekcie 'fcm_requests'. Zariadenia s touto témou dostanú notifikáciu behom pár sekúnd.");
+            } catch (e) {
+                console.error(e);
+                alert("Požiadavku push sa nepodarilo zapísať: " + e.message);
+            } finally {
+                btnSend.disabled = false;
+                btnSend.innerHTML = `<span class="material-symbols-outlined text-lg font-bold">send</span> Odoslať Push Notifikáciu`;
+            }
+        };
+
+        // Targeted message sender function
+        window.sendTargetedMessage = async function() {
+            if (!window.firebaseConnected || !window.firestoreDb) {
+                alert("Pripojte sa najskôr k Firebase pre odoslanie oznamu!");
+                return;
+            }
+
+            const title = document.getElementById('msg-title').value.trim();
+            const body = document.getElementById('msg-body').value.trim();
+            const targetType = document.getElementById('msg-target-type').value;
+            const targetValue = document.getElementById('msg-target-value-container').classList.contains('hidden') ? "" : document.getElementById('msg-target-value').value;
+            const priority = document.getElementById('msg-priority').value;
+
+            if (!title || !body) {
+                alert("Zadajte prosím titulok a obsah správy.");
+                return;
+            }
+
+            const btnSend = document.getElementById('btn-send-msg');
+            btnSend.disabled = true;
+            btnSend.innerText = "Odosiela sa...";
+
+            try {
+                // Generate random doc ID in Firestore
+                const msgRef = doc(collection(window.firestoreDb, "messages"));
+                const msgId = msgRef.id;
+                
+                await setDoc(msgRef, {
+                    id: msgId,
+                    sender: window.currentUserRole === 'admin' ? 'Administrátor' : (window.currentEmployeeName || 'Authorized Person'),
+                    title: title,
+                    body: body,
+                    targetType: targetType,
+                    targetValue: targetValue,
+                    priority: priority === 'high' ? '1' : '2', // Convert to "1" for high, "2" for normal
+                    createdAt: new Date().toISOString(),
+                    readBy: {}
+                });
+
+                // Clear input fields
+                document.getElementById('msg-title').value = "";
+                document.getElementById('msg-body').value = "";
+                
+                alert("Oznam bol úspešne odoslaný zamestnancom!");
+            } catch (e) {
+                console.error(e);
+                alert("Chyba pri odosielaní správy: " + e.message);
+            } finally {
+                btnSend.disabled = false;
+                btnSend.innerHTML = `<span class="material-symbols-outlined text-lg font-bold">send</span> Odoslať Správu`;
+            }
+        };
+
+        // Recipient dropdown selector generator on target change
+        window.onMessageTargetTypeChanged = function() {
+            const type = document.getElementById('msg-target-type').value;
+            const container = document.getElementById('msg-target-value-container');
+            const select = document.getElementById('msg-target-value');
+            const label = document.getElementById('msg-target-value-label');
+            
+            if (type === 'all') {
+                container.classList.add('hidden');
+            } else if (type === 'shift') {
+                container.classList.remove('hidden');
+                label.innerText = 'Vyberte smenu / skupinu';
+                select.innerHTML = `
+                    <option value="top">☀️ Denná skupina (Dennisti)</option>
+                    <option value="bottom">🔄 Zmenová skupina (Smenári)</option>
+                `;
+            } else if (type === 'individual') {
+                container.classList.remove('hidden');
+                label.innerText = 'Vybrať zamestnanca';
+                let html = '';
+                
+                const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
+                const sorted = employees.map(e => e.name).filter(Boolean).sort((a,b) => a.localeCompare(b));
+                
+                if (sorted.length === 0) {
+                    html = `<option value="">(Žiadni zamestnanci)</option>`;
+                } else {
+                    sorted.forEach(name => {
+                        html += `<option value="${name}">${name}</option>`;
+                    });
+                }
+                select.innerHTML = html;
+            }
+        };
+
+        // Listener for sent messages list (Admin monitor)
+        let messagesUnsubscribe = null;
+        window.listenToSentMessagesAdmin = function() {
+            if (!window.firestoreDb) return;
+            
+            if (messagesUnsubscribe) {
+                messagesUnsubscribe();
+            }
+
+            messagesUnsubscribe = onSnapshot(collection(window.firestoreDb, "messages"), (snapshot) => {
+                const listContainer = document.getElementById('sent-messages-list');
+                if (!listContainer) return;
+
+                if (snapshot.empty) {
+                    listContainer.innerHTML = `<p class="text-xs text-gray-500 italic">Neboli nájdené žiadne odoslané oznamy.</p>`;
+                    return;
+                }
+
+                let sortedDocs = [];
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    data.id = docSnap.id;
+                    sortedDocs.push(data);
+                });
+
+                // Sort descending by createdAt
+                sortedDocs.sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+                let html = '';
+                sortedDocs.forEach(msg => {
+                    const dateStr = msg.createdAt ? new Date(msg.createdAt).toLocaleString('sk-SK') : 'neznámy čas';
+                    const isHigh = msg.priority === '1' || msg.priority === 'high';
+                    const priorityLabel = isHigh ? 'Vysoká (1)' : 'Bežná (2)';
+                    const priorityClass = isHigh ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                    const recipientLabel = msg.targetType === 'all' ? 'Všetkým' : 
+                                           msg.targetType === 'shift' ? (msg.targetValue === 'top' ? '☀️ Denná skupina' : '🔄 Zmenová skupina') :
+                                           `👤 Zamestnancovi (${msg.targetValue})`;
+                    
+                    const readByMap = msg.readBy || {};
+                    const readCount = Object.keys(readByMap).length;
+                    const readNames = Object.keys(readByMap).join(', ') || 'nikto';
+
+                    html += `
+                        <div class="bg-brand-slate border border-gray-800 rounded-xl p-4 space-y-2 text-xs">
+                            <div class="flex justify-between items-start gap-2">
+                                <div class="font-bold text-white text-sm">${msg.title || 'Bez názvu'}</div>
+                                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${priorityClass}">${priorityLabel}</span>
+                            </div>
+                            <div class="text-gray-300 leading-normal font-medium whitespace-pre-wrap">${msg.body || ''}</div>
+                            
+                            <div class="pt-2 border-t border-gray-800 flex flex-wrap gap-x-4 gap-y-1 text-gray-400 text-[10px]">
+                                <div>Odoslal: <span class="text-white font-bold">${msg.sender || 'Admin'}</span></div>
+                                <div>Doručiť pre: <span class="text-brand-accent font-bold">${recipientLabel}</span></div>
+                                <div>Čas: <span class="text-gray-500">${dateStr}</span></div>
+                            </div>
+                            
+                            <p class="text-[10px] text-gray-500 mt-2">
+                                <span class="font-bold text-brand-primary">Potvrdili kliknutím (${readCount}):</span> ${readNames}
+                            </p>
+                            
+                            <div class="flex justify-end pt-1">
+                                <button onclick="window.deleteSentMessage('${msg.id}')" class="text-gray-500 hover:text-red-400 font-bold tracking-wider transition text-[10px] flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[12px]">delete</span> Vymazať
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                listContainer.innerHTML = html;
+            }, (error) => {
+                console.error("Messages listening failed:", error);
+            });
+        };
+
+        window.deleteSentMessage = async function(id) {
+            if (!confirm("Naozaj chcete vymazať túto správu zo systému?")) return;
+            try {
+                await deleteDoc(doc(window.firestoreDb, "messages", id));
+            } catch(e) {
+                alert("Chyba pri mazaní správy: " + e.message);
+            }
+        };
+
+        // Real-time listener for current user targeted popup alerts
+        let recipientMessagesUnsubscribe = null;
+        window.listenToTargetedMessages = function() {
+            if (!window.firestoreDb) return;
+            if (recipientMessagesUnsubscribe) {
+                recipientMessagesUnsubscribe();
+            }
+
+            recipientMessagesUnsubscribe = onSnapshot(collection(window.firestoreDb, "messages"), (snapshot) => {
+                if (snapshot.empty) return;
+                
+                // Identify active username and group
+                const userRole = window.currentUserRole;
+                const employeeName = window.currentEmployeeName;
+                
+                // For anonymous users, do not popup unless logged in
+                const isLoggedIn = localStorage.getItem('is_logged_in') === 'true';
+                if (!isLoggedIn) {
+                    return;
+                }
+
+                const myName = userRole === 'admin' ? 'Administrátor' : employeeName;
+                if (!myName) return;
+
+                // Determine my shift (top = Denná, bottom = Zmenová)
+                let myShift = '';
+                if (employeeName) {
+                    const isTop = window.activeRoster?.topEmployees?.some(e => e.name === employeeName);
+                    myShift = isTop ? 'top' : 'bottom';
+                }
+
+                let unreadMessages = [];
+                snapshot.forEach(docSnap => {
+                    const msg = docSnap.data();
+                    msg.id = docSnap.id;
+
+                    const targetType = msg.targetType;
+                    const targetValue = msg.targetValue;
+                    const readBy = msg.readBy || {};
+
+                    // Check if message targets me
+                    let isTarget = false;
+                    if (targetType === 'all') {
+                        isTarget = true;
+                    } else if (targetType === 'shift' && myShift && targetValue === myShift) {
+                        isTarget = true;
+                    } else if (targetType === 'individual' && targetValue && targetValue.trim().toLowerCase() === myName.trim().toLowerCase()) {
+                        isTarget = true;
+                    }
+
+                    // Check if already confirmed
+                    const alreadyRead = Object.keys(readBy).some(name => name.trim().toLowerCase() === myName.trim().toLowerCase());
+
+                    if (isTarget && !alreadyRead) {
+                        unreadMessages.push(msg);
+                    }
+                });
+
+                // Sort by oldest first to pop up sequence
+                unreadMessages.sort((a,b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+                if (unreadMessages.length > 0) {
+                    window.showRecipientMessageModal(unreadMessages[0]);
+                } else {
+                    window.closeRecipientMessageModal();
+                }
+            });
+        };
+
+        window.showRecipientMessageModal = function(msg) {
+            const modal = document.getElementById('recipient-message-modal');
+            if (!modal) return;
+
+            document.getElementById('recipient-message-id').value = msg.id;
+            document.getElementById('recipient-message-title').innerText = msg.title || 'Dôležitý oznam';
+            document.getElementById('recipient-message-body').innerText = msg.body || '';
+            document.getElementById('recipient-message-sender').innerText = msg.sender || 'Administrátor';
+            
+            const dateStr = msg.createdAt ? new Date(msg.createdAt).toLocaleString('sk-SK') : '--';
+            document.getElementById('recipient-message-date').innerText = dateStr;
+            
+            const badge = document.getElementById('recipient-message-priority-badge');
+            const card = document.getElementById('recipient-message-card');
+            const icon = document.getElementById('recipient-message-pref-icon');
+            
+            if (msg.priority === '1' || msg.priority === 'high') {
+                badge.innerText = '⚠️ Vysoká Priorita (1)';
+                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded uppercase mt-0.5 inline-block bg-red-500/20 text-red-400 border border-red-500/30';
+                card.className = 'bg-brand-navy border-2 border-red-500/80 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4';
+                icon.className = 'material-symbols-outlined text-3xl text-red-500';
+                icon.innerText = 'warning';
+            } else {
+                badge.innerText = '✉️ Bežná Správa (2)';
+                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded uppercase mt-0.5 inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                card.className = 'bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4';
+                icon.className = 'material-symbols-outlined text-3xl text-brand-primary';
+                icon.innerText = 'mail';
+            }
+            
+            modal.classList.remove('hidden');
+        };
+
+        window.closeRecipientMessageModal = function() {
+            const modal = document.getElementById('recipient-message-modal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.confirmRecipientMessageRead = async function() {
+            const msgId = document.getElementById('recipient-message-id').value;
+            if (!msgId) return;
+
+            const userRole = window.currentUserRole;
+            const employeeName = window.currentEmployeeName;
+            const myName = userRole === 'admin' ? 'Administrátor' : employeeName;
+
+            if (!myName) return;
+
+            try {
+                const msgRef = doc(window.firestoreDb, "messages", msgId);
+                const fieldPath = `readBy.${myName}`;
+                
+                await updateDoc(msgRef, {
+                    [fieldPath]: new Date().toISOString()
+                });
+                
+                window.closeRecipientMessageModal();
+            } catch(e) {
+                console.error(e);
+                alert("Nepodarilo sa potvrdiť prečítanie: " + e.message);
+            }
+        };
+
+        // Fallback simulation when Firebase is offline
+        function loadRosterFallback() {
+            // Setup default list for top & bottom groups
+            // Dec 2025 has pre-established cells, create clean copies
+            if (window.activeMonthIndex >= 6) {
+                window.activeRoster.topEmployees = JSON.parse(JSON.stringify(juneTopFallback));
+                window.activeRoster.bottomEmployees = JSON.parse(JSON.stringify(juneBottomFallback));
+            } else {
+                window.activeRoster.topEmployees = JSON.parse(JSON.stringify(decemberTopFallback));
+                window.activeRoster.bottomEmployees = JSON.parse(JSON.stringify(decemberBottomFallback));
+            }
+            
+            // Adjust to the right number of days for January vs other selected months
+            const daysInMonth = getLengthOfMonth(window.activeMonthIndex);
+            
+            // Fill missing days with blank entries if needed
+            adjustEmployeeShiftsToMonthLength(window.activeRoster.topEmployees, daysInMonth);
+            adjustEmployeeShiftsToMonthLength(window.activeRoster.bottomEmployees, daysInMonth);
+
+            window.activeRoster.published = false;
+            window.hasUnsavedChanges = false;
+            window.updatePublishUI();
+        }
+
+        function adjustEmployeeShiftsToMonthLength(employeeList, targetLen) {
+            employeeList.forEach(emp => {
+                const cleanShifts = {};
+                for (let d = 1; d <= targetLen; d++) {
+                    if (emp.shifts[d]) {
+                        cleanShifts[d] = emp.shifts[d];
+                    } else {
+                        cleanShifts[d] = { day: d, code: null, hours: null };
+                    }
+                }
+                emp.shifts = cleanShifts;
+            });
+        }
+
+        // Calendar properties
+        function getLengthOfMonth(mIdx) {
+            if (mIdx === 0) return 31; // Dec 2025
+            const year = 2026;
+            return new Date(year, mIdx, 0).getDate();
+        }
+
+        function getDayOfWeekName(day, mIdx) {
+            const year = mIdx === 0 ? 2025 : 2026;
+            const month = mIdx === 0 ? 11 : mIdx - 1; // JS months are 0-indexed
+            const d = new Date(year, month, day);
+            const daysShort = ["Ne", "Po", "Ut", "St", "Št", "Pi", "So"];
+            return daysShort[d.getDay()];
+        }
+
+        function isWeekendDay(day, mIdx) {
+            const year = mIdx === 0 ? 2025 : 2026;
+            const month = mIdx === 0 ? 11 : mIdx - 1;
+            const d = new Date(year, month, day);
+            const dayNum = d.getDay();
+            return dayNum === 0 || dayNum === 6; // Sun or Sat
+        }
+
+        function isHolidayDay(day, mIdx) {
+            if (mIdx === 0) return (day === 24 || day === 25 || day === 26);
+            if (mIdx === 1) return (day === 1 || day === 6);
+            return false;
+        }
+
+        // Handle active months filter change
+        window.onMonthSelected = function() {
+            window.activeMonthIndex = parseInt(document.getElementById('month-selector').value, 10);
+            loadRosterFromFirestore();
+        };
+
+        window.updatePublishUI = function() {
+            const published = !!window.activeRoster.published;
+            const chk = document.getElementById('month-published-checkbox');
+            if (chk) chk.checked = published;
+            
+            const badge = document.getElementById('publish-status-badge');
+            const btn = document.getElementById('btn-toggle-publish');
+            
+            if (badge) {
+                if (window.hasUnsavedChanges) {
+                    badge.innerText = "Rozpracované";
+                    badge.className = "px-3 py-1.5 text-[11px] font-bold rounded-xl uppercase tracking-wider border transition-all duration-300 bg-amber-500/10 text-amber-500 border-amber-500/20 shadow-sm";
+                } else if (published) {
+                    badge.innerText = "Zverejnené";
+                    badge.className = "px-3 py-1.5 text-[11px] font-bold rounded-xl uppercase tracking-wider border transition-all duration-300 bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-sm";
+                } else {
+                    badge.innerText = "Nezverejnený";
+                    badge.className = "px-3 py-1.5 text-[11px] font-bold rounded-xl uppercase tracking-wider border transition-all duration-300 bg-red-500/10 text-red-500 border-red-500/20 shadow-sm";
+                }
+            }
+            if (btn) {
+                if (published) {
+                    btn.innerHTML = `<span class="material-symbols-outlined text-sm">visibility_off</span> Skyť rozpis v aplikácii`;
+                    btn.className = "bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-600/30 px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 shrink-0 shadow-md";
+                } else {
+                    btn.innerHTML = `<span class="material-symbols-outlined text-sm">visibility</span> Zverejniť rozpis v aplikácii`;
+                    btn.className = "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/30 px-5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 shrink-0 shadow-lg shadow-emerald-905/10";
+                }
+            }
+        };
+
+        window.togglePublishState = function() {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            window.activeRoster.published = !window.activeRoster.published;
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+        };
+
+        window.onPublishStateChanged = function() {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            window.activeRoster.published = document.getElementById('month-published-checkbox').checked;
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+        };
+
+        window.resetRosterToFallback = function() {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            if (confirm("Naozaj chcete resetovať rozpis pre tento mesiac späť na predvolenú statickú šablónu? Neuložené zmeny sa stratia.")) {
+                loadRosterFallback();
+                window.hasUnsavedChanges = true;
+                renderRosterUI();
+            }
+        };
+
+        // Render entire grid
+        function renderRosterUI() {
+            window.updatePublishUI();
+            const targetLen = getLengthOfMonth(window.activeMonthIndex);
+            
+            // Header Days Row
+            const hdrDays = document.getElementById('roster-header-days');
+            let thDaysHtml = `<th class="w-48 px-4 py-3 font-semibold text-white bg-brand-navy border-r border-gray-800 sticky top-0 left-0 z-40">Meno Zamestnanca</th>`;
+            thDaysHtml += `<th class="w-16 px-2 py-3 font-semibold text-white bg-brand-navy border-r border-gray-800 text-center">Spolu</th>`;
+            for (let d = 1; d <= targetLen; d++) {
+                const wkClass = isWeekendDay(d, window.activeMonthIndex) ? 'bg-brand-weekend' : 'bg-brand-navy';
+                const holClass = isHolidayDay(d, window.activeMonthIndex) ? 'text-red-400 font-bold' : '';
+                thDaysHtml += `<th class="w-12 px-1 py-1.5 text-center border-r border-gray-800 ${wkClass} ${holClass}">${d}</th>`;
+            }
+            hdrDays.innerHTML = thDaysHtml;
+
+            // Header Weekday Labels Row
+            const hdrWeeks = document.getElementById('roster-header-weeks');
+            let thWeeksHtml = `<th class="px-4 py-1 text-xs text-gray-500 bg-brand-navy border-r border-gray-800 sticky left-0 z-40">Zaradenia</th>`;
+            thWeeksHtml += `<th class="px-2 py-1 text-xs text-center text-gray-500 bg-brand-navy border-r border-gray-800">Hodiny</th>`;
+            for (let d = 1; d <= targetLen; d++) {
+                const dayName = getDayOfWeekName(d, window.activeMonthIndex);
+                const wkClass = isWeekendDay(d, window.activeMonthIndex) ? 'bg-brand-weekend text-orange-400' : 'bg-brand-navy text-gray-500';
+                thWeeksHtml += `<th class="px-1 py-1 text-center font-medium border-r border-gray-800 text-[10px] ${wkClass}">${dayName}</th>`;
+            }
+            hdrWeeks.innerHTML = thWeeksHtml;
+
+            // Generate Top Group (Dennisti) and Bottom Group (Smenári)
+            renderEmployeeRows(window.activeRoster.topEmployees, 'top');
+            renderEmployeeRows(window.activeRoster.bottomEmployees, 'bottom');
+            
+            // Generate and render daily patrol counts
+            renderPatrolCounts();
+            
+            // Populates/updates employee selection list
+            window.populateEmployeeSelector();
+        }
+
+        function getDynamicDayPatrolCounts() {
+            const numDays = getLengthOfMonth(window.activeMonthIndex);
+            const list = Array(numDays).fill(0.0);
+            const rannaCodes = new Set(["SR", "PR", "R"]);
+            
+            const combined = [...(window.activeRoster.topEmployees || []), ...(window.activeRoster.bottomEmployees || [])];
+            
+            const firstLeaderIdx = combined.findIndex(emp => {
+                const nameLower = (emp.name || "").toLowerCase();
+                const nameNoAccents = nameLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return nameLower.includes("bielik") ||
+                       nameLower.includes("kelo") ||
+                       ((nameLower.includes("krenčan") || nameNoAccents.includes("krencan")) && !nameLower.includes("mgr")) ||
+                       (nameLower.includes("obert") && !nameLower.includes("oberfranc"));
+            });
+            
+            const shiftEmployees = firstLeaderIdx >= 0 ? combined.slice(firstLeaderIdx) : (window.activeRoster.bottomEmployees || []);
+            
+            for (let day = 1; day <= numDays; day++) {
+                let activeCount = 0;
+                shiftEmployees.forEach(emp => {
+                    const cell = emp.shifts && emp.shifts[day];
+                    const code = cell && cell.code ? cell.code.trim().toUpperCase() : null;
+                    if (code && rannaCodes.has(code)) {
+                        activeCount++;
+                    }
+                });
+                list[day - 1] = activeCount / 2.0;
+            }
+            return list;
+        }
+
+        function getDynamicNightPatrolCounts() {
+            const numDays = getLengthOfMonth(window.activeMonthIndex);
+            const list = Array(numDays).fill(0.0);
+            const nocnaCodes = new Set(["SN", "PN", "N"]);
+            
+            const combined = [...(window.activeRoster.topEmployees || []), ...(window.activeRoster.bottomEmployees || [])];
+            
+            const firstLeaderIdx = combined.findIndex(emp => {
+                const nameLower = (emp.name || "").toLowerCase();
+                const nameNoAccents = nameLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return nameLower.includes("bielik") ||
+                       nameLower.includes("kelo") ||
+                       ((nameLower.includes("krenčan") || nameNoAccents.includes("krencan")) && !nameLower.includes("mgr")) ||
+                       (nameLower.includes("obert") && !nameLower.includes("oberfranc"));
+            });
+            
+            const shiftEmployees = firstLeaderIdx >= 0 ? combined.slice(firstLeaderIdx) : (window.activeRoster.bottomEmployees || []);
+            
+            for (let day = 1; day <= numDays; day++) {
+                let activeCount = 0;
+                shiftEmployees.forEach(emp => {
+                    const cell = emp.shifts && emp.shifts[day];
+                    const code = cell && cell.code ? cell.code.trim().toUpperCase() : null;
+                    if (code && nocnaCodes.has(code)) {
+                        activeCount++;
+                    }
+                });
+                list[day - 1] = activeCount / 2.0;
+            }
+            return list;
+        }
+
+        function renderPatrolCounts() {
+            const container = document.getElementById('patrol-counts-rows');
+            if (!container) return;
+            
+            const targetLen = getLengthOfMonth(window.activeMonthIndex);
+            const dayCounts = getDynamicDayPatrolCounts();
+            const nightCounts = getDynamicNightPatrolCounts();
+            
+            let html = '';
+            
+            // Header for Patrol Counts Section
+            html += `<tr class="bg-brand-slate/80 select-none">
+                <td class="px-3 py-2 font-bold text-xs uppercase tracking-wider text-[#38bdf8] bg-brand-slate/90 sticky left-0 z-10 border-r border-gray-800 min-w-[195px]">
+                    📊 Denný počet hliadok
+                </td>
+                <td class="px-2 py-3 bg-brand-slate/90 font-bold border-r border-gray-800 text-center text-gray-500 text-xs">-</td>
+                <td colspan="${targetLen}" class="px-4 py-2 font-semibold text-[10px] uppercase tracking-wider text-gray-400 bg-brand-slate/90 text-left">
+                    (Vypočítané z obsadenia smien 1, 2, 3, 4)
+                </td>
+            </tr>`;
+            
+            // Denné hliadky row
+            html += `<tr class="hover:bg-brand-navy/35 transition border-b border-gray-800/40">`;
+            html += `<td class="px-3 py-3 bg-brand-navy border-r border-gray-800 sticky left-0 z-10 font-bold text-gray-300 min-w-[195px] text-xs">`;
+            html += `<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-amber-400 text-sm">wb_sunny</span> Denné hliadky</span>`;
+            html += `</td>`;
+            html += `<td class="px-2 py-3 bg-brand-slate font-bold border-r border-gray-800 text-center text-gray-400 text-xs">-</td>`;
+            
+            for (let d = 1; d <= targetLen; d++) {
+                const count = dayCounts[d - 1];
+                const countStr = count === 0 ? '0' : String(count).replace('.', ',');
+                const isWk = isWeekendDay(d, window.activeMonthIndex);
+                const wkClass = isWk ? 'bg-brand-weekend text-orange-400/90' : 'text-brand-primary';
+                html += `<td class="px-1 py-1.5 border-r border-gray-800 text-center select-none font-bold text-[11px] hover:scale-105 transition hover:shadow-inner ${wkClass}">${countStr}</td>`;
+            }
+            html += `</tr>`;
+            
+            // Nočné hliadky row
+            html += `<tr class="hover:bg-brand-navy/35 transition border-b border-gray-800/40">`;
+            html += `<td class="px-3 py-3 bg-brand-navy border-r border-gray-800 sticky left-0 z-10 font-bold text-gray-300 min-w-[195px] text-xs">`;
+            html += `<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-indigo-400 text-sm">bedtime</span> Nočné hliadky</span>`;
+            html += `</td>`;
+            html += `<td class="px-2 py-3 bg-brand-slate font-bold border-r border-gray-800 text-center text-gray-400 text-xs">-</td>`;
+            
+            for (let d = 1; d <= targetLen; d++) {
+                const count = nightCounts[d - 1];
+                const countStr = count === 0 ? '0' : String(count).replace('.', ',');
+                const isWk = isWeekendDay(d, window.activeMonthIndex);
+                const wkClass = isWk ? 'bg-brand-weekend text-orange-400/90' : 'text-brand-primary';
+                html += `<td class="px-1 py-1.5 border-r border-gray-800 text-center select-none font-bold text-[11px] hover:scale-105 transition hover:shadow-inner ${wkClass}">${countStr}</td>`;
+            }
+            html += `</tr>`;
+            
+            container.innerHTML = html;
+        }
+
+        function renderEmployeeRows(list, group) {
+            const targetLen = getLengthOfMonth(window.activeMonthIndex);
+            const container = document.getElementById(group + '-group-rows');
+            const emptyState = document.getElementById('empty-' + group + '-state');
+            
+            if (!list || list.length === 0) {
+                emptyState.classList.remove('hidden');
+                container.innerHTML = '';
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            let rowsHtml = '';
+            list.forEach((emp, empIdx) => {
+                // Calculate dynamic hours total
+                const totalHoursStr = recalculateHours(emp.shifts);
+                emp.totalHours = totalHoursStr;
+
+                // Highlight row if it is the active employee
+                const isSelectedEmployee = (window.currentUserRole === 'zamestnanec' && emp.name === window.currentEmployeeName);
+                const rowHighlightClass = isSelectedEmployee 
+                    ? 'bg-amber-500/10 border-l-2 border-amber-500 text-amber-300 font-bold' 
+                    : '';
+                const nameHighlightClass = isSelectedEmployee ? 'text-amber-300 font-bold' : 'text-white';
+
+                rowsHtml += `<tr class="hover:bg-brand-navy/35 transition border-b border-gray-800/40 ${rowHighlightClass}">`;
+                
+                // Name column
+                let actionControlsHtml = '';
+                if (window.canEdit) {
+                    actionControlsHtml = `
+                    <div class="flex items-center gap-1 shrink-0 ml-2">
+                        <button onclick="moveEmployee('${group}', ${empIdx}, 'up')" class="text-gray-400 hover:text-white select-none mr-0.5" title="Posunúť hore">
+                            <span class="material-symbols-outlined text-[15px]">arrow_upward</span>
+                        </button>
+                        <button onclick="moveEmployee('${group}', ${empIdx}, 'down')" class="text-gray-400 hover:text-white select-none mr-1" title="Posunúť dole">
+                            <span class="material-symbols-outlined text-[15px]">arrow_downward</span>
+                        </button>
+                        <button onclick="removeEmployee('${group}', ${empIdx})" class="text-red-500 hover:text-red-400 select-none" title="Vymazať zamestnanca">
+                            <span class="material-symbols-outlined text-[15px]">delete</span>
+                        </button>
+                    </div>`;
+                }
+
+                rowsHtml += `<td class="px-3 py-3 bg-brand-navy border-r border-gray-800 sticky left-0 z-10 font-medium ${nameHighlightClass} flex items-center justify-between group min-w-[195px]">
+                    <span class="truncate block max-w-[110px] text-xs">${emp.name}</span>
+                    ${actionControlsHtml}
+                </td>`;
+
+                // Sum columns
+                rowsHtml += `<td class="px-2 py-3 bg-brand-slate font-bold border-r border-gray-800 text-center jetbrains-mono text-brand-primary text-xs">${totalHoursStr}</td>`;
+
+                // Shift days cells
+                for (let d = 1; d <= targetLen; d++) {
+                    const shiftData = emp.shifts[d] || { code: null, hours: null };
+                    const cellCode = shiftData.code || '';
+                    const cellHours = shiftData.hours || '';
+                    
+                    let bgCell = '';
+                    let customStyle = '';
+
+                    if (cellCode) {
+                        const trimmedCode = cellCode.trim().toUpperCase();
+                        if (trimmedCode === 'D') {
+                            customStyle = 'background-color: #FFEA00; color: #000000; font-weight: bold;';
+                        } else if (trimmedCode === 'CH') {
+                            customStyle = 'background-color: #14532D; color: #FFFFFF;';
+                        } else if (trimmedCode === 'PAR' || trimmedCode === 'OČR') {
+                            customStyle = 'background-color: #06B6D4; color: #000000; font-weight: bold;';
+                        } else if (['SR', 'PR', 'R'].includes(trimmedCode)) {
+                            customStyle = 'background-color: #86EFAC; color: #052E16; font-weight: bold;';
+                        } else if (['SN', 'PN', 'N'].includes(trimmedCode)) {
+                            customStyle = 'background-color: #3B82F6; color: #FFFFFF; font-weight: bold;';
+                        } else if (['KZ', 'KZS', 'KZV', 'KZVS'].includes(trimmedCode)) {
+                            customStyle = 'background-color: #D946EF; color: #000000; font-weight: bold;';
+                        } else if (trimmedCode === 'P') {
+                            if (window.isDailyGroupEmployee(emp.name)) {
+                                customStyle = 'background-color: #86EFAC; color: #052E16; font-weight: bold;';
+                            } else {
+                                customStyle = 'background-color: #64748B; color: #FFFFFF;';
+                            }
+                        } else if (trimmedCode === 'V') {
+                            customStyle = 'background-color: #8B5A2B; color: #FFFFFF;';
+                        } else {
+                            customStyle = 'background-color: #475569; color: #F1F5F9;';
+                        }
+                    } else {
+                        // Is weekend?
+                        if (isWeekendDay(d, window.activeMonthIndex)) {
+                            bgCell = 'bg-brand-weekend/60 text-gray-500';
+                        }
+                    }
+
+                    rowsHtml += `<td onclick="openEditCellModal('${group}', ${empIdx}, ${d})" style="${customStyle}" class="px-1 py-1.5 border-r border-gray-800 text-center cursor-pointer select-none border-b border-gray-800 hover:scale-105 transition hover:shadow-inner ${bgCell} min-h-[36px]">
+                        <div class="text-[11px] leading-tight font-bold">${cellCode || ''}</div>
+                        <div class="text-[9px] leading-tight opacity-75 font-normal">${cellHours ? cellHours : ''}</div>
+                    </td>`;
+                }
+
+                rowsHtml += `</tr>`;
+            });
+
+            container.innerHTML = rowsHtml;
+        }
+
+        // Recalculates total monthly decimals with Slovak comma conventions
+        function recalculateHours(shiftsMap) {
+            let sum = 0.0;
+            Object.values(shiftsMap).forEach(cell => {
+                if (cell && cell.hours) {
+                    const cleanStr = String(cell.hours).trim().replace(',', '.');
+                    const parsed = parseFloat(cleanStr);
+                    if (!isNaN(parsed)) {
+                        sum += parsed;
+                    }
+                }
+            });
+            // Convert to 1 decimal place with comma
+            return sum.toFixed(1).replace('.', ',');
+        }
+
+        // Add Employee interaction
+        window.openAddEmployeeModal = function() {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            document.getElementById('add-employee-modal').classList.remove('hidden');
+        };
+
+        window.closeAddEmployeeModal = function() {
+            document.getElementById('add-employee-modal').classList.add('hidden');
+            document.getElementById('new-emp-name').value = '';
+        };
+
+        window.submitAddEmployee = function() {
+            const name = document.getElementById('new-emp-name').value.trim();
+            const group = document.getElementById('new-emp-group').value;
+
+            if (!name) {
+                alert("Prosím zadajte meno zamestnanca!");
+                return;
+            }
+
+            const targetLen = getLengthOfMonth(window.activeMonthIndex);
+            const emptyShifts = {};
+            for (let d = 1; d <= targetLen; d++) {
+                emptyShifts[d] = { day: d, code: null, hours: null };
+            }
+
+            const newEmployeeObj = {
+                name: name,
+                totalHours: "0,0",
+                shifts: emptyShifts
+            };
+
+            if (group === 'top') {
+                window.activeRoster.topEmployees.push(newEmployeeObj);
+            } else {
+                window.activeRoster.bottomEmployees.push(newEmployeeObj);
+            }
+
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+
+            closeAddEmployeeModal();
+            renderRosterUI();
+        };
+
+        // Remove employee
+        window.removeEmployee = function(group, idx) {
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
+            const name = list[idx].name;
+            if (confirm(`Naozaj chcete zamestnanca ${name} natrvalo vymazať z rozpisu pre tento mesiac?`)) {
+                list.splice(idx, 1);
+                window.hasUnsavedChanges = true;
+                window.updatePublishUI();
+                renderRosterUI();
+            }
+        };
+
+        // Edit Shift Single Cell interaction
+        window.openEditCellModal = function(group, empIdx, day) {
+            window.selectedTargetCell = { group, empIdx, day };
+            
+            const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
+            const emp = list[empIdx];
+            const cell = emp.shifts[day] || { code: null, hours: null };
+            
+            document.getElementById('modal-employee-name').innerText = emp.name;
+            document.getElementById('modal-shift-date').innerText = `Dátum úpravy: ${day}. ${window.activeMonthIndex === 0 ? "December 2025" : getSlovakMonthName(window.activeMonthIndex) + " 2026"}`;
+            
+            const adminElements = document.querySelectorAll('.admin-only-modal');
+            const empOnlyView = document.getElementById('employee-only-modal');
+            
+            const isPreviousMonth = window.activeMonthIndex < getCurrentRosterMonthIndex();
+            if (window.canEdit && !isPreviousMonth) {
+                adminElements.forEach(el => el.classList.remove('hidden'));
+                empOnlyView.classList.add('hidden');
+                
+                document.getElementById('modal-input-code').value = cell.code || '';
+                document.getElementById('modal-input-hours').value = cell.hours || '';
+                
+                // Populate move options dropdown dynamically
+                const targetDaysSelect = document.getElementById('modal-move-target-day');
+                const targetLen = getLengthOfMonth(window.activeMonthIndex);
+                let daysOptions = '';
+                for (let d = 1; d <= targetLen; d++) {
+                    daysOptions += `<option value="${d}" ${d === day ? 'disabled' : ''}>${d}. deň</option>`;
+                }
+                targetDaysSelect.innerHTML = daysOptions;
+            } else {
+                adminElements.forEach(el => el.classList.add('hidden'));
+                empOnlyView.classList.remove('hidden');
+                
+                document.getElementById('modal-emp-info-code').innerText = cell.code || "Voľno";
+                document.getElementById('modal-emp-info-hours').innerText = cell.hours ? cell.hours + " hod" : "0 hod";
+                document.getElementById('modal-emp-info-desc').innerText = window.getShiftDesc(cell.code, window.isDailyGroupEmployee(emp.name));
+            }
+
+            document.getElementById('cell-edit-modal').classList.remove('hidden');
+        };
+
+        window.setModalPresets = function(code, hours) {
+            document.getElementById('modal-input-code').value = code;
+            document.getElementById('modal-input-hours').value = hours;
+        };
+
+        window.closeEditModal = function() {
+            document.getElementById('cell-edit-modal').classList.add('hidden');
+            window.selectedTargetCell = null;
+        };
+
+        window.submitModalShiftChange = function() {
+            if (!window.canEdit) {
+                alert("Ako bežný zamestnanec nemáte oprávnenie na úpravu rozpisu!");
+                return;
+            }
+            if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
+                alert("Zmeny v minulých mesiacoch nie sú povolené!");
+                return;
+            }
+            if (!window.selectedTargetCell) return;
+
+            const { group, empIdx, day } = window.selectedTargetCell;
+            const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
+            
+            const rawCode = document.getElementById('modal-input-code').value.trim();
+            const rawHours = document.getElementById('modal-input-hours').value.trim();
+
+            const finalCode = rawCode ? rawCode : null;
+            const finalHours = rawHours ? rawHours.replace('.', ',') : null; // Ensure Slovak decimal comma
+
+            list[empIdx].shifts[day] = {
+                day: day,
+                code: finalCode,
+                hours: finalHours
+            };
+
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+
+            closeEditModal();
+            renderRosterUI();
+        };
+
+        function getSlovakMonthName(mIdx) {
+            const months = ["December", "Január", "Február", "Marec", "Apríl", "Máj", "Jún", "Júl", "August", "September", "Október", "November", "December"];
+            return months[mIdx];
+        }
+
+        function getCurrentRosterMonthIndex() {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = d.getMonth() + 1; // 1-12
+            if (year === 2025 && month === 12) {
+                return 0;
+            } else if (year === 2026) {
+                return month;
+            } else if (year > 2026) {
+                return 12; // Dec 2026
+            } else {
+                return 1; // Jan 2026 default
+            }
+        }
+
+        // Clear local saved config
+        window.clearSavedConfig = function() {
+            if (confirm("Prajete si vyčistiť uložené Firebase overenie v lokálnej pamäti prehliadača?")) {
+                localStorage.removeItem('firebase_config');
+                document.getElementById('firebase-apiKey').value = '';
+                document.getElementById('firebase-authDomain').value = '';
+                document.getElementById('firebase-projectId').value = '';
+                document.getElementById('firebase-storageBucket').value = '';
+                document.getElementById('firebase-messagingSenderId').value = '';
+                document.getElementById('firebase-appId').value = '';
+                alert("Vyčistené!");
+            }
+        };
+
+        // Expand Collapse panels
+        window.toggleSection = function(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById(id.replace('-body', '-arrow'));
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                arrow.innerText = 'expand_less';
+            } else {
+                el.classList.add('hidden');
+                arrow.innerText = 'expand_more';
+            }
+        };
+
+        // Start initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load saved config if any
+            const saved = localStorage.getItem('firebase_config');
+            let parsed = null;
+            if (saved) {
+                try {
+                    parsed = JSON.parse(saved);
+                } catch (e) {
+                    console.error("Zlyhalo načítanie konfigurácie z pamäte: ", e);
+                }
+            }
+
+            // Ak nie je nič v localStorage, ale máme vyplnenú defaultnú statickú konfiguráciu
+            if (!parsed && DEFAULT_FIREBASE_CONFIG && DEFAULT_FIREBASE_CONFIG.apiKey !== "") {
+                parsed = DEFAULT_FIREBASE_CONFIG;
+            }
+
+            if (parsed) {
+                document.getElementById('firebase-apiKey').value = parsed.apiKey || '';
+                document.getElementById('firebase-authDomain').value = parsed.authDomain || '';
+                document.getElementById('firebase-projectId').value = parsed.projectId || '';
+                document.getElementById('firebase-storageBucket').value = parsed.storageBucket || '';
+                document.getElementById('firebase-messagingSenderId').value = parsed.messagingSenderId || '';
+                document.getElementById('firebase-appId').value = parsed.appId || '';
+
+                // Automaticky inicializovať ak máme platné údaje
+                if (parsed.apiKey && parsed.projectId) {
+                    setTimeout(() => {
+                        window.initializeFirebaseApp();
+                    }, 500);
+                }
+            }
+
+            // Init roster grid with fallbacks
+            const monthSelector = document.getElementById('month-selector');
+            if (monthSelector) {
+                monthSelector.value = window.activeMonthIndex.toString();
+            }
+            loadRosterFallback();
+            renderRosterUI();
+            
+            // Set initial role setup and login check
+            window.onLoginStateChanged();
+        });
+
+    </script>
+
+    <!-- Beautiful Full-screen Login Overlay -->
+    <div id="login-overlay" class="hidden fixed inset-0 z-50 bg-[#0B0F17] flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-brand-navy border border-gray-800 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
+            <div class="text-center space-y-2">
+                <!-- Lock Icon -->
+                <div class="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-brand-primary/10 text-brand-primary mb-2">
+                    <span class="material-symbols-outlined text-3xl">lock</span>
+                </div>
+                <h2 class="text-2xl font-bold text-white">Chránený prístup</h2>
+                <p class="text-sm text-gray-400">Na zobrazenie a úpravu rozpisu sa prihláste</p>
+            </div>
+
+            <!-- Login Form Fields -->
+            <div class="space-y-4">
+                <!-- User input field -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Meno z rozpisu</label>
+                    <div class="relative">
+                        <input id="login-username" oninput="onLoginUsernameChanged()" type="text" placeholder="Zadajte presné meno" class="w-full bg-brand-slate border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                        <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400 text-lg">person</span>
+                    </div>
+                </div>
+
+                <!-- Email fields (Only shown for non-special roster users) -->
+                <div id="login-email-section" class="hidden space-y-3 pt-1">
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Možnosť e-mail</label>
+                    <div class="relative">
+                        <input id="login-email" type="email" placeholder="napriklad@email.com" class="w-full bg-brand-slate border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                        <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400 text-lg">mail</span>
+                    </div>
+                    <button onclick="sendWebEmailCode()" class="w-full bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/20 font-semibold py-2.5 rounded-xl text-xs transition">
+                        Odoslať kód na e-mail
+                    </button>
+                </div>
+
+                <!-- Password input field -->
+                <div>
+                    <span id="login-pass-label" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Heslo</span>
+                    <div class="relative flex items-center">
+                        <input id="login-password" type="password" placeholder="Zadajte heslo" class="w-full bg-brand-slate border border-gray-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                        <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400 text-lg">lock</span>
+                        <button onclick="togglePasswordVisibility()" class="absolute right-3 focus:outline-none text-gray-400 hover:text-white transition">
+                            <span id="password-visibility-icon" class="material-symbols-outlined text-lg">visibility</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error alert message container -->
+                <div id="login-error-message" class="hidden text-xs text-red-400 font-medium bg-red-950/20 border border-red-900/40 rounded-xl p-3">
+                    Nepodarilo sa prihlásiť.
+                </div>
+
+                <!-- Submit Button -->
+                <button onclick="submitWebLogin()" class="w-full bg-brand-primary hover:bg-brand-secondary text-brand-slate font-extrabold py-3.5 rounded-xl text-sm transition shadow-lg shadow-brand-primary/10 mt-2">
+                    Prihlásiť sa
+                </button>
+
+                <!-- Forgot password button -->
+                <button onclick="openForgotPasswordDialog()" class="w-full text-center text-xs font-semibold text-brand-primary hover:text-brand-secondary transition py-2 mt-1">
+                    Zabudol som heslo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal: Sent Code -->
+    <div id="sent-code-modal" class="hidden fixed inset-0 z-50 bg-brand-slate/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+            <h3 class="text-lg font-bold text-brand-primary">Prístupový kód odoslaný</h3>
+            <p class="text-xs text-gray-400">Akčný kód bol odoslaný na zadaný e-mail: <br><strong id="sent-code-email-label" class="text-white"></strong></p>
+            
+            <div class="text-xs text-gray-400">Váš prístupový kód pre prihlásenie:</div>
+            <div class="bg-brand-primary/10 border border-brand-primary/20 rounded-xl p-4">
+                <span id="sent-code-value" class="text-3xl font-black text-brand-primary tracking-widest"></span>
+            </div>
+            <p class="text-xs text-gray-500">Tento kód skopírujte a zadajte do textového poľa pre prihlásenie.</p>
+            
+            <button onclick="closeSentCodeModal()" class="w-full bg-brand-slate hover:bg-gray-800 text-white font-semibold py-3 rounded-xl transition text-sm">
+                Rozumiem
+            </button>
+        </div>
+    </div>
+
+    <!-- Alert Modal: Forgot Password -->
+    <div id="forgot-password-modal" class="hidden fixed inset-0 z-50 bg-brand-slate/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div class="flex justify-between items-start">
+                <h3 class="text-lg font-bold text-brand-primary">Zabudol som heslo</h3>
+                <button onclick="closeForgotPasswordDialog()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            
+            <p class="text-xs text-gray-400">Zadajte svoje meno z rozpisu a prihlasovací e-mail. Na zadaný e-mail vám zašleme nové heslo.</p>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Meno z rozpisu</label>
+                    <input id="forgot-username" type="text" placeholder="Napr. admin, Rieger T. alebo Jozef" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">E-mailová adresa</label>
+                    <input id="forgot-email-address" type="email" placeholder="vas@email.com" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                </div>
+                
+                <div id="forgot-error" class="hidden text-xs text-red-400 font-bold"></div>
+                <div id="forgot-success-text" class="hidden text-xs text-emerald-400 font-bold bg-[#0a141d] border border-emerald-900/40 p-3 rounded-xl col-span-2"></div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeForgotPasswordDialog()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-2.5 rounded-xl transition text-xs">
+                    Zrušiť
+                </button>
+                <button id="forgot-submit-btn" onclick="submitForgotPasswordWeb()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-2.5 rounded-xl transition text-xs">
+                    Odoslať nové heslo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal: Targeted Message Popup for Recipient -->
+    <div id="recipient-message-modal" class="hidden fixed inset-0 z-50 bg-brand-slate/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div id="recipient-message-card" class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-gray-800/60 pb-3">
+                <span id="recipient-message-pref-icon" class="material-symbols-outlined text-3xl">info</span>
+                <div>
+                    <h3 id="recipient-message-title" class="text-sm font-bold text-white">Dôležitý oznam</h3>
+                    <p id="recipient-message-priority-badge" class="text-[9px] font-bold px-2 py-0.5 rounded uppercase mt-0.5 inline-block"></p>
+                </div>
+            </div>
+            
+            <p id="recipient-message-body" class="text-xs text-gray-200 leading-relaxed font-medium whitespace-pre-wrap">Obsah správy...</p>
+            
+            <div class="text-right text-[10px] text-gray-400">
+                Odoslal: <span id="recipient-message-sender" class="font-bold">--</span> | <span id="recipient-message-date">--</span>
+            </div>
+
+            <input type="hidden" id="recipient-message-id" value="">
+
+            <div class="pt-2">
+                <button onclick="window.confirmRecipientMessageRead()" class="w-full bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/10">
+                    <span class="material-symbols-outlined text-sm font-bold">check_circle</span>
+                    Potvrdiť prečítanie oznamu
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

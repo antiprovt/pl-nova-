@@ -1,0 +1,6 @@
+{
+  "name": "Šichtér",
+  "description": "Prehľadný kalendár pre evidenciu pracovných zmien (8h/12h, ranná/poobedná/nočná), poznámok, udalostí a automatický výpočet odpracovaných hodín.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
