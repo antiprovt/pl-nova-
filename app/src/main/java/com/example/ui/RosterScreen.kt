@@ -308,6 +308,8 @@ fun RosterScreen(modifier: Modifier = Modifier) {
                         "Fond pracovného času: 172,5 | 161 hod."
                     } else if (RosterData.activeRosterMonth == 1) {
                         "Fond pracovného času: 180,0 | 168 hod."
+                    } else if (RosterData.activeRosterMonth == 7) {
+                        "Fond pracovného času: 172,5 | 161 hod."
                     } else {
                         "Fond pracovného času: ${String.format(java.util.Locale.US, "%.1f", shiftFundValue).replace(".0", ",0")} | ${regularFundValue.toInt()} hod."
                     }

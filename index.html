@@ -108,6 +108,85 @@
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-8">
 
+        <!-- Mobile App Download Hero Section -->
+        <section class="bg-gradient-to-br from-brand-navy to-brand-slate border-2 border-brand-primary/30 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
+            <!-- Decorative accent glow -->
+            <div class="absolute -right-24 -top-24 w-48 h-48 rounded-full bg-brand-primary/10 blur-3xl pointer-events-none"></div>
+            <div class="absolute -left-24 -bottom-24 w-48 h-48 rounded-full bg-brand-accent/5 blur-3xl pointer-events-none"></div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+                <!-- Left column: Text & Info -->
+                <div class="lg:col-span-7 space-y-5">
+                    <div class="inline-flex items-center gap-2 bg-brand-primary/10 text-brand-primary text-xs font-bold px-3 py-1.5 rounded-full border border-brand-primary/20">
+                        <span class="material-symbols-outlined text-sm font-bold">smartphone</span>
+                        Mobilná Aplikácia pre Android
+                    </div>
+                    <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
+                        Chcete plnú verziu aplikácie <span class="text-brand-primary">Šichter</span> vo vašom mobile?
+                    </h2>
+                    <p class="text-gray-300 leading-relaxed text-sm md:text-base">
+                        Webové stránky na GitHub Pages slúžia ako <span class="font-semibold text-white">webová verzia rozhrania</span> (Admin Panel a prehliadač smien). Webové prehliadače nedokážu priamo spustiť mobilné aplikácie pre Android (súbory <code class="bg-brand-slate px-1.5 py-0.5 rounded text-brand-accent jetbrains-mono text-xs">.apk</code>). 
+                    </p>
+                    <p class="text-gray-300 leading-relaxed text-sm md:text-base">
+                        Svoju obľúbenú natívnu aplikáciu <strong>Šichter</strong> si však môžete veľmi jednoducho <strong>stiahnuť a nainštalovať do telefónu</strong> priamo odtiaľto!
+                    </p>
+
+                    <!-- Large Download Button & QR placeholder row -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
+                        <a href="Stiahnut-APK.apk" download="Sichter.apk" class="bg-brand-primary hover:bg-brand-secondary text-brand-slate font-extrabold text-center px-6 py-4 rounded-2xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center gap-3 shadow-lg shadow-brand-primary/20 hover:shadow-brand-primary/35">
+                            <span class="material-symbols-outlined text-2xl font-bold animate-bounce">download</span>
+                            <div class="text-left">
+                                <div class="text-xs uppercase tracking-wider opacity-85 leading-none">Stiahnuť pre Android</div>
+                                <div class="text-lg font-black leading-tight">Šichter Aplikácia (APK)</div>
+                            </div>
+                        </a>
+                        <div class="text-xs text-gray-400 sm:max-w-xs text-center sm:text-left flex items-center justify-center gap-2 px-3 py-2 bg-brand-slate/40 border border-gray-800 rounded-xl">
+                            <span class="material-symbols-outlined text-brand-accent text-lg">verified_user</span>
+                            <span>Bezpečný súbor priamo z vášho overeného úložiska na GitHub.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right column: Modern instructions card -->
+                <div class="lg:col-span-5 bg-brand-slate/80 border border-gray-800/80 rounded-2xl p-5 md:p-6 shadow-xl">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2 mb-4 border-b border-gray-800 pb-3">
+                        <span class="material-symbols-outlined text-brand-accent">info</span>
+                        Rýchly návod na inštaláciu:
+                    </h3>
+                    
+                    <ul class="space-y-4">
+                        <li class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                1
+                            </div>
+                            <div class="text-xs md:text-sm text-gray-300">
+                                <strong class="text-white">Stiahnite súbor</strong><br>
+                                Kliknite na modré tlačidlo vľavo a uložte súbor <code class="bg-brand-navy px-1 rounded text-brand-accent text-[11px]">Sichter.apk</code>.
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                2
+                            </div>
+                            <div class="text-xs md:text-sm text-gray-300">
+                                <strong class="text-white">Povolte neznáme zdroje</strong><br>
+                                Ak vás systém Android pri otvorení upozorní, v nastaveniach prehliadača alebo správcu súborov povoľte inštaláciu aplikácií z tohto zdroja.
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                3
+                            </div>
+                            <div class="text-xs md:text-sm text-gray-300">
+                                <strong class="text-white">Dokončite inštaláciu</strong><br>
+                                Potvrďte kliknutím na <strong class="text-brand-accent">Inštalovať</strong>. Aplikácia sa pridá na vašu plochu a môžete ju začať plne využívať!
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
         <!-- Tabs Navigation -->
         <div class="flex border-b border-gray-800 space-x-2">
             <div class="px-6 py-3 font-semibold text-sm rounded-t-xl flex items-center gap-2 border-b-2 border-brand-primary text-brand-primary bg-brand-navy/30">
@@ -1072,6 +1151,206 @@ service cloud.firestore {
                 12, "D", "11,5", 13, "SN", "11,5", 16, "SR", "11,5", 17, "SN", "11,5", 19, "V", "5,0",
                 20, "SR", "11,5", 21, "SN", "11,5", 24, "D", "11,5", 25, "SN", "11,5", 28, "D", "11,5",
                 29, "SN", "11,5"
+            ])
+        ];
+
+        const julyTopFallback = [
+            createEmployeeJS("PaedDr. Adámik M.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "P", "7,5", 7, "P", "7,5",
+                8, "D", "7,5", 9, "D", "7,5", 10, "D", "7,5", 13, "D", "7,5", 14, "D", "7,5",
+                15, "D", "7,5", 16, "D", "7,5", 17, "D", "7,5", 20, "D", "7,5", 21, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 27, "P", "7,5", 28, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Kovančík", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "D", "7,5", 7, "D", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 13, "P", "7,5", 14, "P", "7,5",
+                15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5", 20, "P", "7,5", 21, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 27, "D", "7,5", 28, "D", "7,5",
+                29, "D", "7,5", 30, "D", "7,5", 31, "D", "7,5"
+            ]),
+            createEmployeeJS("Kováčová R.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "P", "7,5", 7, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 13, "P", "7,5", 14, "P", "7,5",
+                15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5", 20, "P", "7,5", 21, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 27, "P", "7,5", 28, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Adámik R.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "P", "7,5", 7, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 13, "P", "7,5", 14, "P", "7,5",
+                15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5", 20, "SR", "11,5", 21, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 27, "P", "7,5", 28, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ]),
+            createEmployeeJS("Roštáš A.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "P", "7,5", 7, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 13, "P", "7,5", 14, "P", "7,5",
+                15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5", 20, "P", "7,5", 21, "P", "7,5",
+                22, "P", "7,5", 23, "SR", "11,5", 24, "P", "7,5", 27, "P", "7,5", 28, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Peťko M.", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "P", "7,5", 7, "P", "7,5",
+                8, "D", "7,5", 9, "D", "7,5", 10, "D", "7,5", 13, "D", "7,5", 14, "D", "7,5",
+                15, "D", "7,5", 16, "D", "7,5", 17, "D", "7,5", 20, "P", "7,5", 21, "SR", "11,5",
+                22, "SN", "11,5", 23, "D", "7,5", 27, "P", "7,5", 28, "P", "7,5", 29, "P", "7,5",
+                30, "P", "7,5", 31, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Šebeľédy", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "P", "7,5", 7, "P", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5", 11, "SR", "11,5", 13, "P", "7,5",
+                14, "P", "7,5", 15, "P", "7,5", 16, "SN", "11,5", 20, "P", "7,5", 21, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "SR", "11,5", 28, "P", "7,5", 29, "P", "7,5",
+                30, "P", "7,5", 31, "P", "7,5"
+            ]),
+            createEmployeeJS("Bc. Töröková", [
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5", 6, "P", "7,5", 7, "P", "7,5",
+                8, "SR", "11,5", 9, "P", "7,5", 10, "P", "7,5", 13, "D", "7,5", 14, "D", "7,5",
+                15, "D", "7,5", 16, "D", "7,5", 17, "D", "7,5", 20, "D", "7,5", 21, "P", "7,5",
+                22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5", 27, "P", "7,5", 28, "P", "7,5",
+                29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ]),
+            createEmployeeJS("Bielik R.", [
+                3, "SR", "11,5", 4, "SN", "11,5", 7, "SR", "11,5", 11, "D", "11,5",
+                12, "D", "11,5", 15, "D", "11,5", 16, "D", "11,5", 19, "SR", "11,5",
+                20, "SN", "11,5", 21, "SN", "11,5", 24, "D", "11,5", 25, "SN", "11,5",
+                28, "SR", "11,5", 29, "SN", "11,5", 31, "SR", "11,5"
+            ]),
+            createEmployeeJS("Fábry J.", [
+                3, "PR", "11,5", 4, "PN", "11,5", 7, "PR", "11,5", 8, "PN", "11,5",
+                11, "PN", "11,5", 12, "N", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "R", "11,5", 20, "N", "11,5", 23, "PR", "11,5", 24, "PN", "11,5",
+                27, "PR", "11,5", 28, "PN", "11,5", 31, "PR", "11,5"
+            ]),
+            createEmployeeJS("Bc. Bariš D.", [
+                3, "PR", "11,5", 4, "PN", "11,5", 7, "PR", "11,5", 8, "PN", "11,5",
+                11, "PN", "11,5", 12, "N", "11,5", 15, "PR", "11,5", 16, "PN", "11,5",
+                19, "R", "11,5", 20, "D", "11,5", 23, "D", "11,5", 24, "D", "11,5",
+                25, "D", "11,5", 27, "PR", "11,5", 28, "PN", "11,5", 31, "PR", "11,5"
+            ]),
+            createEmployeeJS("PhDr. Kabát", [
+                3, "R", "11,5", 4, "N", "11,5", 7, "PR", "11,5", 8, "R", "11,5",
+                11, "D", "11,5", 12, "PN", "11,5", 15, "R", "11,5", 16, "R", "11,5",
+                17, "N", "11,5", 21, "PR", "11,5", 22, "R", "11,5", 25, "D", "11,5",
+                28, "R", "11,5", 29, "R", "11,5", 31, "D", "11,5"
+            ]),
+            createEmployeeJS("Kazár D.", [
+                6, "PR", "11,5", 7, "R", "11,5", 8, "N", "11,5", 11, "D", "11,5",
+                12, "PN", "11,5", 15, "R", "11,5", 16, "R", "11,5", 17, "N", "11,5",
+                21, "PR", "11,5", 22, "R", "11,5", 23, "N", "11,5", 24, "D", "11,5",
+                28, "D", "11,5", 29, "D", "11,5", 31, "D", "11,5"
+            ]),
+            createEmployeeJS("Polyák A.", [
+                3, "R", "11,5", 4, "R", "11,5", 7, "R", "11,5", 10, "N", "11,5",
+                11, "PR", "11,5", 12, "N", "11,5", 15, "PR", "11,5", 18, "PR", "11,5",
+                19, "PN", "11,5", 22, "D", "11,5", 23, "D", "11,5", 24, "D", "11,5",
+                28, "D", "11,5", 29, "D", "11,5", 31, "D", "11,5"
+            ]),
+            createEmployeeJS("Bc. Petráš A.", [
+                3, "D", "11,5", 4, "D", "11,5", 7, "D", "11,5", 8, "D", "11,5",
+                11, "D", "11,5", 12, "D", "11,5", 15, "D", "11,5", 16, "D", "11,5",
+                18, "PR", "11,5", 19, "PN", "11,5", 24, "N", "11,5", 25, "N", "11,5",
+                28, "R", "11,5", 29, "R", "11,5", 31, "R", "11,5"
+            ]),
+            createEmployeeJS("Bc. Kelo R.", [
+                1, "SN", "11,5", 4, "SR", "11,5", 5, "SN", "11,5", 8, "SR", "11,5",
+                9, "SN", "11,5", 12, "SR", "11,5", 13, "SN", "11,5", 16, "SR", "11,5",
+                17, "SN", "11,5", 20, "D", "11,5", 21, "D", "11,5", 24, "D", "11,5",
+                25, "SN", "11,5", 28, "SR", "11,5", 29, "SN", "11,5"
+            ]),
+            createEmployeeJS("Sautner R.", [
+                1, "PN", "11,5", 4, "PR", "11,5", 5, "PN", "11,5", 8, "D", "11,5",
+                12, "PR", "11,5", 13, "PN", "11,5", 16, "PR", "11,5", 17, "PN", "11,5",
+                20, "PR", "11,5", 21, "PN", "11,5", 24, "PR", "11,5", 25, "PN", "11,5",
+                28, "PR", "11,5", 29, "PN", "11,5", 31, "R", "11,5"
+            ]),
+            createEmployeeJS("Andruška Z.", [
+                1, "PN", "11,5", 4, "PR", "11,5", 5, "PN", "11,5", 8, "D", "11,5",
+                9, "D", "11,5", 12, "PR", "11,5", 13, "PN", "11,5", 16, "PR", "11,5",
+                17, "PN", "11,5", 20, "PR", "11,5", 21, "PN", "11,5", 24, "PR", "11,5",
+                25, "PN", "11,5", 28, "PR", "11,5", 29, "PN", "11,5"
+            ]),
+            createEmployeeJS("Bc. Masaryk", [
+                1, "N", "11,5", 4, "N", "11,5", 7, "R", "11,5", 8, "PR", "11,5",
+                9, "PN", "11,5", 12, "D", "11,5", 13, "D", "11,5", 16, "D", "11,5",
+                17, "D", "11,5", 20, "R", "11,5", 21, "R", "11,5", 24, "N", "11,5",
+                25, "N", "11,5", 30, "R", "11,5", 31, "N", "11,5"
+            ]),
+            createEmployeeJS("Šovčík M.", [
+                1, "N", "11,5", 4, "N", "11,5", 7, "R", "11,5", 9, "PR", "11,5",
+                10, "PN", "11,5", 12, "D", "11,5", 13, "D", "11,5", 16, "D", "11,5",
+                17, "D", "11,5", 20, "D", "11,5", 21, "D", "11,5", 24, "D", "11,5",
+                25, "D", "11,5", 28, "D", "11,5", 29, "D", "11,5"
+            ])
+        ];
+
+        const julyBottomFallback = [
+            createEmployeeJS("Bc. Obert L.", [
+                1, "SR", "11,5", 2, "SN", "11,5", 5, "SR", "11,5", 6, "SN", "11,5",
+                9, "SR", "11,5", 10, "SN", "11,5", 14, "SR", "11,5", 18, "SR", "11,5",
+                19, "SN", "11,5", 21, "SR", "11,5", 22, "SN", "11,5", 25, "SR", "11,5",
+                26, "SN", "11,5", 29, "D", "11,5", 30, "D", "11,5"
+            ]),
+            createEmployeeJS("Adámik P.", [
+                1, "PR", "11,5", 2, "PN", "11,5", 5, "PR", "11,5", 6, "PN", "11,5",
+                9, "R", "11,5", 10, "N", "11,5", 13, "PR", "11,5", 14, "PN", "11,5",
+                17, "PR", "11,5", 18, "PN", "11,5", 21, "PR", "11,5", 22, "PN", "11,5",
+                26, "R", "11,5", 28, "R", "11,5", 29, "N", "11,5"
+            ]),
+            createEmployeeJS("Gacs Š.", [
+                1, "PR", "11,5", 2, "PN", "11,5", 5, "PR", "11,5", 6, "PN", "11,5",
+                9, "R", "11,5", 10, "D", "11,5", 11, "D", "11,5", 12, "D", "11,5",
+                13, "D", "11,5", 21, "PR", "11,5", 22, "PN", "11,5", 26, "R", "11,5",
+                28, "R", "11,5", 29, "N", "11,5", 31, "R", "11,5"
+            ]),
+            createEmployeeJS("Kabát M.", [
+                2, "R", "11,5", 5, "D", "11,5", 6, "R", "11,5", 10, "PR", "11,5",
+                11, "PN", "11,5", 14, "PR", "11,5", 15, "PN", "11,5", 17, "PR", "11,5",
+                18, "PN", "11,5", 21, "PR", "11,5", 22, "PN", "11,5", 25, "PR", "11,5",
+                26, "PN", "11,5", 29, "PR", "11,5", 30, "PN", "11,5"
+            ]),
+            createEmployeeJS("Kinčok K.", [
+                2, "R", "11,5", 3, "N", "11,5", 6, "PR", "11,5", 7, "PN", "11,5",
+                10, "PR", "11,5", 11, "PN", "11,5", 14, "PR", "11,5", 15, "PN", "11,5",
+                17, "D", "11,5", 21, "PR", "11,5", 22, "PN", "11,5", 25, "PR", "11,5",
+                26, "PN", "11,5", 29, "PR", "11,5", 30, "PN", "11,5"
+            ]),
+            createEmployeeJS("Mgr. Krenčan", [
+                1, "R", "11,5", 4, "SR", "11,5", 5, "SR", "11,5", 8, "SN", "11,5",
+                10, "N", "11,5", 13, "SR", "11,5", 15, "SR", "11,5", 17, "PR", "11,5",
+                18, "SR", "11,5", 21, "SR", "11,5", 22, "SR", "11,5", 25, "SR", "11,5",
+                27, "N", "11,5", 28, "SR", "11,5", 29, "SN", "11,5"
+            ]),
+            createEmployeeJS("Krenčan M.", [
+                2, "SR", "11,5", 3, "SN", "11,5", 6, "SN", "11,5", 9, "SR", "11,5",
+                10, "SN", "11,5", 11, "SN", "11,5", 14, "SR", "11,5", 15, "SN", "11,5",
+                19, "D", "11,5", 21, "D", "11,5", 22, "D", "11,5", 25, "D", "11,5",
+                26, "SN", "11,5", 29, "SR", "11,5", 30, "SN", "11,5"
+            ]),
+            createEmployeeJS("Nemec M.", [
+                2, "D", "11,5", 5, "D", "11,5", 6, "D", "11,5", 9, "D", "11,5",
+                10, "D", "11,5", 14, "PR", "11,5", 15, "PN", "11,5", 18, "PR", "11,5",
+                19, "PN", "11,5", 21, "PR", "11,5", 22, "PN", "11,5", 25, "PR", "11,5",
+                26, "N", "11,5", 29, "R", "11,5", 30, "N", "11,5"
+            ]),
+            createEmployeeJS("Rieger T.", [
+                3, "N", "11,5", 5, "PR", "11,5", 6, "PN", "11,5", 9, "PR", "11,5",
+                10, "D", "11,5", 13, "D", "11,5", 14, "PN", "11,5", 17, "PR", "11,5",
+                18, "PN", "11,5", 21, "PR", "11,5", 22, "PN", "11,5", 25, "D", "11,5",
+                26, "D", "11,5", 29, "D", "11,5", 30, "D", "11,5"
+            ]),
+            createEmployeeJS("Lukáč Martin", [
+                2, "PR", "11,5", 3, "PN", "11,5", 6, "PR", "11,5", 7, "PN", "11,5",
+                10, "PR", "11,5", 11, "PN", "11,5", 14, "D", "11,5", 15, "D", "11,5",
+                18, "D", "11,5", 19, "D", "11,5", 22, "D", "11,5", 25, "PR", "11,5",
+                26, "PN", "11,5", 29, "PR", "11,5", 30, "PN", "11,5"
+            ]),
+            createEmployeeJS("Szelényi L.", [
+                2, "PR", "11,5", 3, "PN", "11,5", 6, "D", "11,5", 7, "D", "11,5",
+                10, "D", "11,5", 11, "D", "11,5", 13, "D", "11,5", 17, "N", "11,5",
+                18, "R", "11,5", 19, "R", "11,5", 20, "R", "11,5", 24, "PR", "11,5",
+                25, "PN", "11,5", 28, "PR", "11,5", 29, "PN", "11,5"
             ])
         ];
 
@@ -2065,7 +2344,10 @@ service cloud.firestore {
         function loadRosterFallback() {
             // Setup default list for top & bottom groups
             // Dec 2025 has pre-established cells, create clean copies
-            if (window.activeMonthIndex >= 6) {
+            if (window.activeMonthIndex === 7) {
+                window.activeRoster.topEmployees = JSON.parse(JSON.stringify(julyTopFallback));
+                window.activeRoster.bottomEmployees = JSON.parse(JSON.stringify(julyBottomFallback));
+            } else if (window.activeMonthIndex >= 6) {
                 window.activeRoster.topEmployees = JSON.parse(JSON.stringify(juneTopFallback));
                 window.activeRoster.bottomEmployees = JSON.parse(JSON.stringify(juneBottomFallback));
             } else {
