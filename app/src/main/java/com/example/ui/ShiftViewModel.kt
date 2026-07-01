@@ -153,6 +153,11 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
         _selectedDate.value = null
     }
 
+    fun setSelectedMonth(ym: YearMonth) {
+        _selectedMonth.value = ym
+        _selectedDate.value = ym.atDay(1)
+    }
+
     fun nextMonth() {
         _selectedMonth.value = _selectedMonth.value.plusMonths(1)
         // Auto-select first day of next month to keep selection clean
@@ -174,7 +179,7 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
         val month = date.monthValue
         val monthIndex = when {
             year == 2025 && month == 12 -> 0
-            year == 2026 && month == 1 -> 1
+            year == 2026 && month in 1..12 -> month
             else -> return
         }
         val day = date.dayOfMonth

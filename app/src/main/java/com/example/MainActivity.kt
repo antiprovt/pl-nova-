@@ -318,6 +318,28 @@ object ShiftColorScheme {
 @Composable
 fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
     val selectedMonth by viewModel.selectedMonth.collectAsStateWithLifecycle()
+
+    // Bidirectional Month Synchronization between Calendar View (selectedMonth) and Firebase Roster (activeRosterMonth)
+    LaunchedEffect(selectedMonth) {
+        val mappedIndex = if (selectedMonth.year == 2025 && selectedMonth.monthValue == 12) {
+            0
+        } else if (selectedMonth.year == 2026 && selectedMonth.monthValue in 1..12) {
+            selectedMonth.monthValue
+        } else {
+            1
+        }
+        if (com.example.ui.RosterData.activeRosterMonth != mappedIndex) {
+            com.example.ui.RosterData.switchMonth(mappedIndex)
+        }
+    }
+
+    val activeRosterMonth = com.example.ui.RosterData.activeRosterMonth
+    LaunchedEffect(activeRosterMonth) {
+        val ym = com.example.ui.RosterData.getYearMonthForIndex(activeRosterMonth)
+        if (selectedMonth != ym) {
+            viewModel.setSelectedMonth(ym)
+        }
+    }
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val currentView by viewModel.currentView.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -763,11 +785,7 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
 
                         IconButton(
                             onClick = {
-                                if (currentView == "rozpis") {
-                                    showRosterSettingsDialog = true
-                                } else {
-                                    showSettingsDialog = true
-                                }
+                                showSettingsDialog = true
                             },
                             modifier = Modifier.testTag("settings_btn")
                         ) {
@@ -781,6 +799,39 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp)
                     )
                 )
+            },
+            bottomBar = {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
+                    tonalElevation = 8.dp
+                ) {
+                    NavigationBarItem(
+                        selected = currentView == "shichter",
+                        onClick = { viewModel.setCurrentView("shichter") },
+                        icon = { Icon(imageVector = Icons.Default.DateRange, contentDescription = "Moje zmeny") },
+                        label = { Text("Moje zmeny", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier.testTag("nav_shichter")
+                    )
+                    NavigationBarItem(
+                        selected = currentView == "rozpis",
+                        onClick = { viewModel.setCurrentView("rozpis") },
+                        icon = { Icon(imageVector = Icons.Default.List, contentDescription = "Celkový rozpis") },
+                        label = { Text("Celkový rozpis", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier.testTag("nav_rozpis")
+                    )
+                }
             },
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
@@ -1102,12 +1153,17 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
             personalAllowance = personalAllowance,
             shiftAllowance = shiftAllowance,
             mealAllowance = mealAllowance,
+            isRosterNotificationsEnabled = isRosterNotificationsEnabled,
             onUserNameChange = { name ->
                 userName = name
                 prefs.edit().putString("user_name", name).apply()
             },
             onShowFirebaseSync = {
                 showFirebaseDialog = true
+                showSettingsDialog = false
+            },
+            onShowManageMessages = {
+                showManageMessagesDialog = true
                 showSettingsDialog = false
             },
             onShareMyShifts = { onlyCycle ->
@@ -1182,41 +1238,19 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 mealAllowance = valAllowance
                 prefs.edit().putFloat("meal_allowance", valAllowance).apply()
             },
-            onDismiss = { showSettingsDialog = false }
-        )
-    }
-
-    // Roster Settings Dialog
-    if (showRosterSettingsDialog) {
-        RosterSettingsDialog(
-            themeMode = themeMode,
-            isNotificationsEnabled = isRosterNotificationsEnabled,
-            userName = userName,
-            onShowFirebaseSync = {
-                showFirebaseDialog = true
-                showRosterSettingsDialog = false
-            },
-            onShowManageMessages = {
-                showManageMessagesDialog = true
-                showRosterSettingsDialog = false
-            },
-            onToggleNotifications = { enabled ->
+            onToggleRosterNotifications = { enabled ->
                 isRosterNotificationsEnabled = enabled
                 prefs.edit().putBoolean("roster_notifications_enabled", enabled).apply()
-            },
-            onToggleTheme = { mode ->
-                viewModel.setThemeMode(mode)
-                prefs.edit().putString("theme_mode", mode).apply()
             },
             onLogout = {
                 prefs.edit().putBoolean("is_logged_in", false).apply()
                 onLogout()
-                showRosterSettingsDialog = false
+                showSettingsDialog = false
             },
             onUpdateAuthorizedUsers = { newSet ->
                 authorizedAiUsers = newSet
             },
-            onDismiss = { showRosterSettingsDialog = false }
+            onDismiss = { showSettingsDialog = false }
         )
     }
 
@@ -1742,8 +1776,10 @@ fun SettingsDialog(
     personalAllowance: Float,
     shiftAllowance: Float,
     mealAllowance: Float,
+    isRosterNotificationsEnabled: Boolean,
     onUserNameChange: (String) -> Unit,
     onShowFirebaseSync: () -> Unit,
+    onShowManageMessages: () -> Unit,
     onShareMyShifts: (Boolean) -> Unit,
     onImportShifts: (String) -> Boolean,
     onToggleCountdown: (Boolean) -> Unit,
@@ -1755,19 +1791,34 @@ fun SettingsDialog(
     onPersonalAllowanceChange: (Float) -> Unit,
     onShiftAllowanceChange: (Float) -> Unit,
     onMealAllowanceChange: (Float) -> Unit,
+    onToggleRosterNotifications: (Boolean) -> Unit,
+    onLogout: () -> Unit,
+    onUpdateAuthorizedUsers: (Set<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
+    
     var isFinancialSettingsExpanded by remember { mutableStateOf(false) }
+    var editPasswordInput by remember { mutableStateOf(prefs.getString("roster_login_password", "") ?: "") }
+    var changeSuccessMessage by remember { mutableStateOf<String?>(null) }
+    var changeErrorMessage by remember { mutableStateOf<String?>(null) }
+    var rosterEmailInput by remember { mutableStateOf(prefs.getString("user_email", "") ?: "") }
+    
+    var importInput by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf(false) }
+    var importSuccess by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .fillMaxHeight(0.9f)
+                .padding(8.dp)
                 .testTag("settings_dialog"),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(
                 modifier = Modifier
@@ -1775,40 +1826,52 @@ fun SettingsDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Header
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = "Nastavenia aplikácie",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Nastavenia Sichter",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Zavrieť")
+                    }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
+                // PART 1: VZHĽAD A PROFIL
+                Text(
+                    text = "Vzhľad a Profil",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
                 // Theme Mode Selection
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Vzhľad aplikácie",
-                        style = MaterialTheme.typography.bodyLarge,
+                        text = "Farebný motív",
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        text = "Vyberte si farebný motív aplikácie (policajný motív s modrými prvkami).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1857,10 +1920,10 @@ fun SettingsDialog(
                                         modifier = Modifier.size(20.dp),
                                         tint = contentColor
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = label,
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         textAlign = TextAlign.Center
@@ -1871,22 +1934,103 @@ fun SettingsDialog(
                     }
                 }
 
+                // Username input
+                OutlinedTextField(
+                    value = userName,
+                    onValueChange = onUserNameChange,
+                    label = { Text("Meno používateľa (Príslušník)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("settings_username_input")
+                )
+
+                // Email Input
+                OutlinedTextField(
+                    value = rosterEmailInput,
+                    onValueChange = { input ->
+                        rosterEmailInput = input
+                        prefs.edit().putString("user_email", input).apply()
+                    },
+                    label = { Text("Prihlasovací e-mail") },
+                    placeholder = { Text("Napr. jan@email.com") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("roster_settings_email_input"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // Passcode Input
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Prístupové heslo (6-miestne)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = editPasswordInput,
+                            onValueChange = { input ->
+                                if (input.length <= 6 && input.all { it.isDigit() }) {
+                                    editPasswordInput = input
+                                    changeSuccessMessage = null
+                                    changeErrorMessage = null
+                                }
+                            },
+                            placeholder = { Text("Nové heslo (6 číslic)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_password_input"),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Button(
+                            onClick = {
+                                if (editPasswordInput.length == 6) {
+                                    prefs.edit().putString("roster_login_password", editPasswordInput).apply()
+                                    changeSuccessMessage = "Heslo úspešne uložené!"
+                                    changeErrorMessage = null
+                                } else {
+                                    changeErrorMessage = "Heslo musí mať presne 6 číslic!"
+                                    changeSuccessMessage = null
+                                }
+                            },
+                            modifier = Modifier.testTag("settings_password_save_btn"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Uložiť")
+                        }
+                    }
+                    changeSuccessMessage?.let { msg ->
+                        Text(text = msg, style = MaterialTheme.typography.bodySmall, color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
+                    }
+                    changeErrorMessage?.let { err ->
+                        Text(text = err, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium)
+                    }
+                }
+
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // PART 2: MOJE ZMENY (ŠICHTER) NASTAVENIA
+                Text(
+                    text = "Moje zmeny (Šichter)",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
                 // Shift Length configuration
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Dĺžka zmeny (Predvolená)",
-                        style = MaterialTheme.typography.bodyLarge,
+                        text = "Predvolená dĺžka zmeny",
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        text = "Vyberte predvolenú dĺžku zmeny pre novovytvorené zmeny alebo kolobehy.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1942,26 +2086,21 @@ fun SettingsDialog(
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                // Countdown and Active Shift visibility option
+                // Countdown Row
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Čas zmeny a odpočet",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Zobrazí aktívnu zmenu a odpočet času do konca zmeny na hlavnej obrazovke.",
+                            text = "Zobrazí aktívnu zmenu a odpočet na domovskej obrazovke.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1973,26 +2112,21 @@ fun SettingsDialog(
                     )
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                // Cleaner Mode Switch
+                // Cleaner Mode Row
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Cleaner mód",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Zobrazí iba typ zmeny a skryje možnosti poznámok či úloh.",
+                            text = "Zobrazí iba typ zmeny a skryje detaily/úlohy.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2004,9 +2138,7 @@ fun SettingsDialog(
                     )
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                // Osobné a platové nastavenia (Osobný tarifný plat, osobné príplatky, dovolenka)
+                // Osobné a platové nastavenia
                 OutlinedCard(
                     onClick = { isFinancialSettingsExpanded = !isFinancialSettingsExpanded },
                     modifier = Modifier
@@ -2041,12 +2173,12 @@ fun SettingsDialog(
                             Column {
                                 Text(
                                     text = "Osobné a platové nastavenia",
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (isFinancialSettingsExpanded) "Kliknutím skryjete podrobnosti" else "Tarif, osobný príplatok, iné bonusy, dovolenka",
+                                    text = if (isFinancialSettingsExpanded) "Kliknutím skryjete" else "Tarif, bonusy, dovolenka",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2054,7 +2186,7 @@ fun SettingsDialog(
                         }
                         Icon(
                             imageVector = if (isFinancialSettingsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = if (isFinancialSettingsExpanded) "Skryť" else "Zobraziť",
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -2065,12 +2197,6 @@ fun SettingsDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
                     ) {
-                        Text(
-                            text = "Nastavte si svoje osobné finančné parametre pre presný výpočet mzdy a príplatkov. Hodinová sadzba sa počíta ako tarifný plat delený 177.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
                         var tariffText by remember(tariffSalary) {
                             mutableStateOf(String.format(java.util.Locale.US, "%.2f", tariffSalary).replace(".", ","))
                         }
@@ -2091,10 +2217,7 @@ fun SettingsDialog(
                                 }
                             },
                             label = { Text("Tarifný plat (€/mesiac)") },
-                            placeholder = { Text("Napr. 936,50") },
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().testTag("settings_tariff_salary_input")
                         )
@@ -2109,10 +2232,7 @@ fun SettingsDialog(
                                 }
                             },
                             label = { Text("Osobný príplatok (€/mesiac)") },
-                            placeholder = { Text("Napr. 380,00") },
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().testTag("settings_personal_allowance_input")
                         )
@@ -2127,26 +2247,17 @@ fun SettingsDialog(
                                 }
                             },
                             label = { Text("Príplatok iné (€/mesiac)") },
-                            placeholder = { Text("Rôzne mesačné bonusy a stabilné príplatky, napr. 40,00") },
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().testTag("settings_shift_allowance_input")
                         )
 
-
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Ročný nárok na dovolenku",
+                            text = "Ročný nárok na dovolenku (dni)",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Zadajte nárok v dňoch. 1 deň zodpovedá 12 hodinám. Po pridaní dovolenky v kalendári sa zostávajúcy počet dní poctivo odráta.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         var allowanceText by remember(vacationAllowance) {
@@ -2166,59 +2277,283 @@ fun SettingsDialog(
                                 }
                             },
                             label = { Text("Počet dní dovolenky") },
-                            placeholder = { Text("Napr. 25") },
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().testTag("settings_vacation_allowance_input")
                         )
 
-                        // Vacation Summary Table
                         val remainingDays = vacationAllowance.toDouble() - spentVacationDays
                         val spentHours = spentVacationDays * 12.0
 
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                            ),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Celkový nárok:", style = MaterialTheme.typography.bodyMedium)
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Celkový nárok:", style = MaterialTheme.typography.bodySmall)
                                     Text("${if (vacationAllowance % 1f == 0f) vacationAllowance.toInt().toString() else String.format(java.util.Locale.US, "%.1f", vacationAllowance).replace(".", ",")} dní", fontWeight = FontWeight.Bold)
                                 }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Vyčerpané v kalendári:", style = MaterialTheme.typography.bodyMedium)
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Vyčerpané v kalendári:", style = MaterialTheme.typography.bodySmall)
                                     val spentStr = if (spentVacationDays % 1.0 == 0.0) spentVacationDays.toInt().toString() else String.format(java.util.Locale.US, "%.1f", spentVacationDays).replace(".", ",")
                                     val spentHoursStr = if (spentHours % 1.0 == 0.0) spentHours.toInt().toString() else String.format(java.util.Locale.US, "%.1f", spentHours).replace(".", ",")
                                     Text("$spentStr dní ($spentHoursStr h)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 }
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Zostáva dovolenky:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                    val remainingStr = if (remainingDays % 1.0 == 0.0) remainingDays.toInt().toString() else String.format(java.util.Locale.US, "%.1f", remainingDays).replace(".", ",")
+                                    val color = if (remainingDays < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                    Text(text = "$remainingStr dní", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = color)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // PART 3: ZDIEĽANIE A IMPORT
+                Text(
+                    text = "Zdieľanie a Import",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Button(
+                    onClick = { onShareMyShifts(false) },
+                    modifier = Modifier.fillMaxWidth().testTag("settings_share_btn"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Share, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Zdieľať moje zmeny s poznámkami")
+                }
+
+                Button(
+                    onClick = { onShareMyShifts(true) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                    modifier = Modifier.fillMaxWidth().testTag("settings_share_cycle_btn"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Share, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Zdieľať iba kolobeh zmien")
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(text = "Importovať zmeny zo schránky", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = importInput,
+                            onValueChange = { importInput = it; importError = false; importSuccess = false },
+                            placeholder = { Text("Sem vložte import kód") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("settings_import_input"),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Button(
+                            onClick = {
+                                if (importInput.isNotBlank()) {
+                                    val success = onImportShifts(importInput.trim())
+                                    if (success) {
+                                        importSuccess = true
+                                        importError = false
+                                        importInput = ""
+                                    } else {
+                                        importError = true
+                                        importSuccess = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.testTag("settings_import_btn"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Import")
+                        }
+                    }
+                    if (importSuccess) {
+                        Text("Zmeny boli úspešne načítané do náhľadu!", style = MaterialTheme.typography.bodySmall, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                    }
+                    if (importError) {
+                        Text("Chybný import kód!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // PART 4: ADMINISTRÁTORSKÉ MOŽNOSTI & SYNCHRONIZÁCIA
+                val isAdmin = userName.trim().equals("admin", ignoreCase = true) || userName.trim().equals("Rieger T.", ignoreCase = true)
+                Text(
+                    text = if (isAdmin) "Administrátor a Cloud Sync" else "Cloud Synchronizácia",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Roster Notifications Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Upozornenia pre rozpis",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Povoliť systémové upozornenia na zmeny v rozpise.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = isRosterNotificationsEnabled,
+                        onCheckedChange = onToggleRosterNotifications,
+                        modifier = Modifier.testTag("roster_notifications_switch")
+                    )
+                }
+
+                // Connection indicator row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onShowFirebaseSync() }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Firebase Synchronizácia",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Nastavenia prepojenia s webom a synchronizácie zmien v reálnom čase.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Firebase",
+                        tint = if (com.example.ui.FirebaseSync.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("firebase_sync_btn_icon")
+                    )
+                }
+
+                if (isAdmin) {
+                    // Internal Messages Management Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onShowManageMessages() }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Správa interných správ",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Uverejňovanie oznamov s potvrdzovaním o prečítaní.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Email,
+                            contentDescription = "Správa správ",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.testTag("manage_messages_btn_icon")
+                        )
+                    }
+
+                    // AI Permissions Row
+                    var showAiPermissions by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showAiPermissions = !showAiPermissions }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Prístup k AI asistentovi",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Vyberte príslušníkov s povolením používať AI asistenta.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = if (showAiPermissions) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Rozbaliť",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    if (showAiPermissions) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val employeesList = remember {
+                                (com.example.ui.RosterData.topEmployees + com.example.ui.RosterData.bottomEmployees).map { it.name }.distinct().sorted()
+                            }
+                            var authorizedSet by remember {
+                                val saved = prefs.getStringSet("authorized_ai_users", null)
+                                mutableStateOf(saved ?: setOf("admin", "Rieger T.", "riegert", "rieger t."))
+                            }
+
+                            employeesList.forEach { empName ->
+                                val isAuthorized = authorizedSet.any { it.trim().equals(empName.trim(), ignoreCase = true) }
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Zostáva dovolenky:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                    val remainingStr = if (remainingDays % 1.0 == 0.0) remainingDays.toInt().toString() else String.format(java.util.Locale.US, "%.1f", remainingDays).replace(".", ",")
-                                    val color = if (remainingDays < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                                    Text(
-                                        text = "$remainingStr dní",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = color
+                                    Text(text = empName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                                    Checkbox(
+                                        checked = isAuthorized,
+                                        onCheckedChange = { checked ->
+                                            val newSet = authorizedSet.toMutableSet()
+                                            if (checked) {
+                                                newSet.add(empName)
+                                            } else {
+                                                if (!empName.trim().equals("admin", ignoreCase = true) && !empName.trim().equals("Rieger T.", ignoreCase = true)) {
+                                                    newSet.removeAll { it.trim().equals(empName.trim(), ignoreCase = true) }
+                                                }
+                                            }
+                                            prefs.edit().putStringSet("authorized_ai_users", newSet).apply()
+                                            authorizedSet = newSet
+                                            onUpdateAuthorizedUsers(newSet)
+                                        }
                                     )
                                 }
                             }
@@ -2226,44 +2561,44 @@ fun SettingsDialog(
                     }
                 }
 
-                if (userName.trim().equals("admin", ignoreCase = true)) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onShowFirebaseSync()
-                                onDismiss()
-                            }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Firebase Synchronizácia",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Nastavenia prepojenia so spoločným webovým admin panelom a synchronizácia zmien.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Logout Action Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onLogout()
+                            onDismiss()
                         }
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Firebase Synchronizácia",
-                            tint = if (com.example.ui.FirebaseSync.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.testTag("firebase_sync_btn_icon")
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Odhlásiť sa",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = "Uzamkne celú aplikáciu a vráti vás na prihlasovaciu obrazovku.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = "Odhlásiť sa",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("logout_btn_icon")
+                    )
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
+                // Footer Actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
