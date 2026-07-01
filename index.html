@@ -56,428 +56,711 @@
         }
     </script>
 </head>
-<body class="min-h-screen pb-16">
+<body class="bg-[#0B1220] text-[#E0E6ED] min-h-screen font-sans overflow-x-hidden">
 
-    <!-- Header / Banner -->
-    <header class="bg-gradient-to-r from-brand-navy to-brand-slate border-b border-gray-800 shadow-xl">
-        <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-brand-primary flex items-center justify-center text-brand-slate shadow-lg shadow-brand-primary/20">
-                    <span class="material-symbols-outlined text-3xl font-bold">calendar_month</span>
+    <!-- Responsive Sidebar Navigation (Drawer) -->
+    <aside id="sidebar-drawer" class="fixed inset-y-0 left-0 z-50 w-72 bg-[#151D2A] border-r border-[#233044] flex flex-col justify-between transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl">
+        <div>
+            <!-- Sidebar Header -->
+            <div class="px-6 py-5 flex items-center gap-3 border-b border-[#233044]">
+                <div class="w-10 h-10 rounded-xl bg-[#90CAF9] flex items-center justify-center text-[#0B1220] shadow-lg shadow-[#90CAF9]/10">
+                    <span class="material-symbols-outlined text-2xl font-bold">calendar_month</span>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                        Šichtér <span class="bg-brand-primary/10 text-brand-primary text-xs px-2.5 py-1 rounded-full border border-brand-primary/20">Admin Panel</span>
+                    <h2 class="text-lg font-extrabold tracking-tight text-white">Šichtér</h2>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Plánovač smien</p>
+                </div>
+                <!-- Close Drawer Button (Mobile only) -->
+                <button onclick="window.toggleSidebar(false)" class="lg:hidden ml-auto text-gray-400 hover:text-white rounded-full p-1.5 hover:bg-gray-850 transition">
+                    <span class="material-symbols-outlined text-xl">close</span>
+                </button>
+            </div>
+
+            <!-- Navigation Items -->
+            <nav class="p-4 space-y-2.5">
+                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-3 mb-2">Zobrazenie</div>
+                
+                <!-- Tab: Moje zmeny -->
+                <button id="nav-btn-shichter" onclick="window.switchView('shichter')" class="w-full px-4 py-3.5 rounded-2xl flex items-center gap-3.5 text-sm font-bold transition-all text-[#90CAF9] bg-[#1565C0]/20 border border-[#1565C0]/30 shadow-md">
+                    <span class="material-symbols-outlined text-xl">date_range</span>
+                    <span>Moje zmeny (Šichter)</span>
+                    <span class="ml-auto w-1.5 h-1.5 rounded-full bg-[#90CAF9]"></span>
+                </button>
+
+                <!-- Tab: Celkový rozpis -->
+                <button id="nav-btn-rozpis" onclick="window.switchView('rozpis')" class="w-full px-4 py-3.5 rounded-2xl flex items-center gap-3.5 text-sm font-bold transition-all text-gray-400 hover:text-white hover:bg-gray-800/40">
+                    <span class="material-symbols-outlined text-xl">list_alt</span>
+                    <span>Celkový rozpis (Rozpis)</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Sidebar Footer -->
+        <div class="p-4 border-t border-[#233044] space-y-3 bg-[#0B1220]/40">
+            <!-- Mobile app download link -->
+            <a href="Stiahnut-APK.apk" download class="block w-full text-center bg-gradient-to-r from-[#1E3A8A] to-[#1D4ED8] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-extrabold py-3 px-4 rounded-2xl text-xs transition shadow-lg shadow-blue-950/20 flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-base">download</span>
+                Stiahnuť aplikáciu APK
+            </a>
+            <div class="text-center">
+                <p class="text-[10px] text-gray-500 font-bold">Verzia 1.5 • December 2025</p>
+                <p class="text-[9px] text-gray-600 mt-0.5">Slovenská legislatíva 2026</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Sidebar backdrop overlay (Mobile only) -->
+    <div id="sidebar-overlay" onclick="window.toggleSidebar(false)" class="hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden transition-opacity duration-300"></div>
+
+    <!-- Main Content Area Wrapper -->
+    <div class="lg:pl-72 flex flex-col min-h-screen">
+        
+        <!-- Top App Bar -->
+        <header class="sticky top-0 z-30 bg-[#151D2A]/90 backdrop-blur-md border-b border-[#233044] px-4 py-4 sm:px-6 flex items-center justify-between shadow-md">
+            <div class="flex items-center gap-3">
+                <!-- Hamburger Menu Button -->
+                <button onclick="window.toggleSidebar(true)" class="lg:hidden text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-full p-2 transition">
+                    <span class="material-symbols-outlined text-2xl">menu</span>
+                </button>
+                <div>
+                    <h1 id="app-bar-title" class="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                        Šichter <span id="active-month-badge" class="text-[10px] font-bold bg-[#90CAF9]/10 text-[#90CAF9] border border-[#90CAF9]/25 px-2.5 py-0.5 rounded-full capitalize">Január 2026</span>
                     </h1>
-                    <p class="text-sm text-gray-400">Správa smien v reálnom čase, Firestore a push notifikácie (FCM)</p>
+                    <p class="text-[10px] text-gray-400 hidden sm:block">Moderná evidencia a plánovanie pracovných zmien</p>
                 </div>
             </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <a href="#db-docs" class="text-xs sm:text-sm text-brand-accent hover:text-white transition duration-200 flex items-center gap-1.5 bg-brand-darkBlue/25 px-3 py-2 rounded-lg border border-brand-darkBlue/50">
-                    <span class="material-symbols-outlined text-lg">description</span>
-                    Dokumentácia DB
-                </a>
-                <span id="connection-badge" class="flex items-center gap-2 bg-red-950/40 text-red-400 border border-red-900 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium">
-                    <span class="h-2 w-2 rounded-full bg-red-500 animate-ping"></span>
-                    Odpojený od Firebase
+
+            <div class="flex items-center gap-3.5">
+                <!-- Live Connection Badge -->
+                <span id="connection-badge" class="flex items-center gap-2 bg-red-950/40 text-red-400 border border-red-900/50 px-3 py-1.5 rounded-xl text-xs font-semibold">
+                    <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping shrink-0"></span>
+                    Odpojený
                 </span>
-                
-                <!-- Active User Role Profile Panel -->
-                <div id="user-profile-panel" class="flex flex-wrap sm:flex-nowrap items-center gap-3 bg-brand-slate/40 border border-gray-800/80 px-3 py-2 rounded-xl">
-                    <span class="material-symbols-outlined text-brand-primary text-xl">account_circle</span>
-                    <div class="text-left">
-                        <h3 class="text-xs font-bold text-white flex items-center gap-1.5 leading-tight">
+
+                <!-- Notification Bell with count -->
+                <div class="relative cursor-pointer hover:bg-gray-850 p-2 rounded-xl transition" onclick="window.switchView('rozpis'); document.getElementById('db-docs').scrollIntoView({behavior: 'smooth'});">
+                    <span class="material-symbols-outlined text-gray-400 hover:text-white text-xl">notifications</span>
+                    <span id="notification-dot" class="hidden absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                </div>
+
+                <!-- Settings Button -->
+                <button onclick="window.openSettingsDialog()" class="text-gray-400 hover:text-white hover:bg-gray-850 p-2 rounded-xl transition" title="Nastavenia">
+                    <span class="material-symbols-outlined text-xl">settings</span>
+                </button>
+
+                <!-- User Profile & Avatar -->
+                <div id="user-profile-panel" class="flex items-center gap-2.5 pl-3 border-l border-[#233044]">
+                    <div class="text-right hidden sm:block">
+                        <h3 class="text-xs font-extrabold text-white flex items-center gap-1.5 leading-none">
                             <span id="profile-display-name">Načítavam...</span>
-                            <span id="profile-display-badge" class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-primary text-brand-slate">Rola</span>
+                            <span id="profile-display-badge" class="px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider bg-sky-600 text-white">Zamestnanec</span>
                         </h3>
-                        <p class="text-[9px] text-gray-500">Prihlásený v systéme</p>
+                        <p class="text-[9px] text-gray-500 mt-1">Prihlásený</p>
                     </div>
-                    <!-- Highlight for currently logged in employee (if role is zamestnanec) -->
-                    <div id="logged-highlight-box" class="hidden flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 px-2 py-1 rounded-lg text-[10px] text-amber-300">
-                        <span class="material-symbols-outlined text-xs">lightbulb</span>
-                        Aktívny
-                    </div>
-                    <button onclick="logoutCurrentUser()" class="bg-red-950/45 hover:bg-red-900 border border-red-900/60 text-red-300 font-medium px-2.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1 shadow-lg">
-                        <span class="material-symbols-outlined text-sm">logout</span>
-                        Odhlásiť
+                    <!-- Highlight banner for active employee -->
+                    <div id="logged-highlight-box" class="hidden h-3 w-3 rounded-full bg-amber-500" title="Aktívny profil"></div>
+                    <!-- Logout -->
+                    <button onclick="logoutCurrentUser()" class="text-red-400 hover:text-red-300 hover:bg-red-950/20 rounded-xl p-2 transition" title="Odhlásiť sa">
+                        <span class="material-symbols-outlined text-xl">logout</span>
                     </button>
                 </div>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-8">
-
-        <!-- Mobile App Download Hero Section -->
-        <section class="bg-gradient-to-br from-brand-navy to-brand-slate border-2 border-brand-primary/30 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
-            <!-- Decorative accent glow -->
-            <div class="absolute -right-24 -top-24 w-48 h-48 rounded-full bg-brand-primary/10 blur-3xl pointer-events-none"></div>
-            <div class="absolute -left-24 -bottom-24 w-48 h-48 rounded-full bg-brand-accent/5 blur-3xl pointer-events-none"></div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
-                <!-- Left column: Text & Info -->
-                <div class="lg:col-span-7 space-y-5">
-                    <div class="inline-flex items-center gap-2 bg-brand-primary/10 text-brand-primary text-xs font-bold px-3 py-1.5 rounded-full border border-brand-primary/20">
-                        <span class="material-symbols-outlined text-sm font-bold">smartphone</span>
-                        Mobilná Aplikácia pre Android
+        <!-- Main Content Area -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
+            
+            <!-- VIEW 1: MOJE ZMENY (ŠICHTER) -->
+            <section id="view-shichter" class="space-y-6">
+                <!-- Profile/Employee Preview Select for Admins -->
+                <div id="profile-preview-container" class="hidden bg-[#151D2A] border border-[#233044] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-[#90CAF9] text-2xl">supervisor_account</span>
+                        <div>
+                            <h3 class="text-sm font-bold text-white">Náhľad profilu zamestnanca (Administrátor)</h3>
+                            <p class="text-xs text-gray-400">Ako administrátor môžete zobraziť a upraviť kalendár ktoréhokoľvek zamestnanca</p>
+                        </div>
                     </div>
-                    <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
-                        Chcete plnú verziu aplikácie <span class="text-brand-primary">Šichter</span> vo vašom mobile?
-                    </h2>
-                    <p class="text-gray-300 leading-relaxed text-sm md:text-base">
-                        Webové stránky na GitHub Pages slúžia ako <span class="font-semibold text-white">webová verzia rozhrania</span> (Admin Panel a prehliadač smien). Webové prehliadače nedokážu priamo spustiť mobilné aplikácie pre Android (súbory <code class="bg-brand-slate px-1.5 py-0.5 rounded text-brand-accent jetbrains-mono text-xs">.apk</code>). 
-                    </p>
-                    <p class="text-gray-300 leading-relaxed text-sm md:text-base">
-                        Svoju obľúbenú natívnu aplikáciu <strong>Šichter</strong> si však môžete veľmi jednoducho <strong>stiahnuť a nainštalovať do telefónu</strong> priamo odtiaľto!
-                    </p>
+                    <div class="relative min-w-[200px]">
+                        <select id="preview-profile-selector" onchange="window.onPreviewProfileChanged()" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-xs text-white appearance-none focus:outline-none focus:border-[#90CAF9] transition pr-10 font-bold">
+                            <!-- Populated dynamically -->
+                        </select>
+                        <span class="material-symbols-outlined absolute right-3 top-2.5 text-gray-400 pointer-events-none text-sm">expand_more</span>
+                    </div>
+                </div>
 
-                    <!-- Large Download Button & QR placeholder row -->
-                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
-                        <a href="Stiahnut-APK.apk" download="Sichter.apk" class="bg-brand-primary hover:bg-brand-secondary text-brand-slate font-extrabold text-center px-6 py-4 rounded-2xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center gap-3 shadow-lg shadow-brand-primary/20 hover:shadow-brand-primary/35">
-                            <span class="material-symbols-outlined text-2xl font-bold animate-bounce">download</span>
-                            <div class="text-left">
-                                <div class="text-xs uppercase tracking-wider opacity-85 leading-none">Stiahnuť pre Android</div>
-                                <div class="text-lg font-black leading-tight">Šichter Aplikácia (APK)</div>
+                <!-- Sub Navigation Tabs (Android Material 3 TabRow style) -->
+                <div class="flex border-b border-[#233044] space-x-1.5 scrollbar-none overflow-x-auto">
+                    <button id="subtab-btn-calendar" onclick="window.switchSubTab('calendar')" class="px-5 py-3 font-extrabold text-xs rounded-t-2xl flex items-center gap-2 border-b-2 border-[#90CAF9] text-[#90CAF9] bg-[#151D2A]/60 transition">
+                        <span class="material-symbols-outlined text-base">calendar_view_month</span>
+                        MÔJ KALENDÁR / DEŇ
+                    </button>
+                    <button id="subtab-btn-stats" onclick="window.switchSubTab('stats')" class="px-5 py-3 font-bold text-xs rounded-t-2xl flex items-center gap-2 border-b-2 border-transparent text-gray-400 hover:text-white transition">
+                        <span class="material-symbols-outlined text-base">analytics</span>
+                        MOJE ŠTATISTIKY
+                    </button>
+                    <button id="subtab-btn-overview" onclick="window.switchSubTab('overview')" class="px-5 py-3 font-bold text-xs rounded-t-2xl flex items-center gap-2 border-b-2 border-transparent text-gray-400 hover:text-white transition">
+                        <span class="material-symbols-outlined text-base">format_list_bulleted</span>
+                        PREHĽAD MESIACA
+                    </button>
+                </div>
+
+                <!-- Sub Tab 1: Môj Kalendár -->
+                <div id="subtab-calendar" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    <!-- Calendar Matrix Card (Col span 2) -->
+                    <div class="xl:col-span-2 bg-[#151D2A] border border-[#233044] rounded-3xl p-5 shadow-lg space-y-4">
+                        <!-- Roster active month select inside calendar header -->
+                        <div class="flex items-center justify-between border-b border-[#233044] pb-4">
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[#90CAF9]">grid_view</span>
+                                Kalendár smien na zvolený mesiac
+                            </h3>
+                            <div class="relative">
+                                <select id="subtab-month-selector" onchange="window.syncRosterMonth(this.value)" class="bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2 text-xs text-white appearance-none focus:outline-none focus:border-[#90CAF9] transition pr-8 font-extrabold">
+                                    <option value="0">December 2025</option>
+                                    <option value="1" selected>Január 2026</option>
+                                    <option value="2">Február 2026</option>
+                                    <option value="3">Marec 2026</option>
+                                    <option value="4">Apríl 2026</option>
+                                    <option value="5">Máj 2026</option>
+                                    <option value="6">Jún 2026</option>
+                                    <option value="7">Júl 2026</option>
+                                    <option value="8">August 2026</option>
+                                    <option value="9">September 2026</option>
+                                    <option value="10">Október 2026</option>
+                                    <option value="11">November 2026</option>
+                                    <option value="12">December 2026</option>
+                                </select>
+                                <span class="material-symbols-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-sm">expand_more</span>
                             </div>
-                        </a>
-                        <div class="text-xs text-gray-400 sm:max-w-xs text-center sm:text-left flex items-center justify-center gap-2 px-3 py-2 bg-brand-slate/40 border border-gray-800 rounded-xl">
-                            <span class="material-symbols-outlined text-brand-accent text-lg">verified_user</span>
-                            <span>Bezpečný súbor priamo z vášho overeného úložiska na GitHub.</span>
+                        </div>
+
+                        <!-- Calendar Days Header (Mon-Sun labels) -->
+                        <div class="grid grid-cols-7 gap-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider pb-1">
+                            <div>Po</div>
+                            <div>Ut</div>
+                            <div>St</div>
+                            <div>Št</div>
+                            <div>Pi</div>
+                            <div class="text-orange-400">So</div>
+                            <div class="text-orange-400">Ne</div>
+                        </div>
+
+                        <!-- Calendar Grid Body (Populated dynamically) -->
+                        <div id="my-calendar-grid" class="grid grid-cols-7 gap-2 pb-2">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Interactive Day Details Editor Sidebar/Card (Col span 1) -->
+                    <div id="my-day-details-editor" class="space-y-4">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+
+                <!-- Sub Tab 2: Moje Štatistiky -->
+                <div id="subtab-stats" class="space-y-6 hidden">
+                    <!-- Quick Metrics Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <!-- Metric: Total Hours -->
+                        <div class="bg-[#151D2A] border border-[#233044] rounded-2xl p-5 shadow-md flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-[#90CAF9]/15 text-[#90CAF9] flex items-center justify-center">
+                                <span class="material-symbols-outlined text-2xl font-bold">schedule</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Odpracované hodiny</h4>
+                                <p id="stats-total-hours" class="text-2xl font-black text-white mt-1">0,0</p>
+                                <p class="text-[9px] text-gray-500 mt-0.5 font-bold">Z toho nadčasy: <span id="stats-total-overtime-label" class="text-[#90CAF9]">0 h</span></p>
+                            </div>
+                        </div>
+
+                        <!-- Metric: Mornings Count -->
+                        <div class="bg-[#151D2A] border border-[#233044] rounded-2xl p-5 shadow-md flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-green-500/10 text-green-400 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-2xl">wb_sunny</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ranné služby (R/SR)</h4>
+                                <p id="stats-count-morning" class="text-2xl font-black text-white mt-1">0</p>
+                                <p class="text-[9px] text-gray-500 mt-0.5">Služieb celkovo</p>
+                            </div>
+                        </div>
+
+                        <!-- Metric: Nights Count -->
+                        <div class="bg-[#151D2A] border border-[#233044] rounded-2xl p-5 shadow-md flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-2xl">bedtime</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nočné služby (N/SN)</h4>
+                                <p id="stats-count-night" class="text-2xl font-black text-white mt-1">0</p>
+                                <p class="text-[9px] text-gray-500 mt-0.5">Služieb celkovo</p>
+                            </div>
+                        </div>
+
+                        <!-- Metric: Vacation/Sick -->
+                        <div class="bg-[#151D2A] border border-[#233044] rounded-2xl p-5 shadow-md flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-2xl">umbrella</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Dovolenka / PN</h4>
+                                <p id="stats-count-absences" class="text-2xl font-black text-white mt-1">0 D / 0 CH</p>
+                                <p class="text-[9px] text-gray-500 mt-0.5 font-bold">Vyčerpaná dovolenka</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row: Slovak Pay Calculator Card & Settings Panel -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- 2026 Slovak Salary Estimate Card (Spans 2 cols) -->
+                        <div class="lg:col-span-2 bg-[#151D2A] border border-[#90CAF9]/25 rounded-3xl p-6 shadow-xl space-y-6 relative overflow-hidden">
+                            <!-- Background glow -->
+                            <div class="absolute -right-16 -top-16 w-48 h-48 rounded-full bg-[#1565C0]/10 blur-3xl pointer-events-none"></div>
+                            
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-[#90CAF9]/10 text-[#90CAF9] flex items-center justify-center">
+                                        <span class="material-symbols-outlined text-xl">payments</span>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xs font-extrabold text-[#90CAF9] uppercase tracking-wider">ODHAD VÝPLATY k r. 2026</h3>
+                                        <p class="text-[10px] text-gray-500 mt-0.5">Informatívny výpočet podľa platných zákonov SR</p>
+                                    </div>
+                                </div>
+                                <button onclick="window.toggleSalaryDetails()" class="text-xs font-bold text-[#90CAF9] hover:text-[#42A5F5] bg-[#90CAF9]/10 border border-[#90CAF9]/20 px-3 py-1.5 rounded-xl transition flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-xs">tune</span>
+                                    <span id="salary-details-btn-text">Rozbaliť položky</span>
+                                </button>
+                            </div>
+
+                            <!-- Brutto vs Netto Display Board -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                <div class="bg-[#0B1220]/60 border border-[#233044] p-4 rounded-2xl flex flex-col justify-center">
+                                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hrubá mzda (Brutto)</span>
+                                    <span id="salary-brutto" class="text-2xl font-black text-white mt-1">0,00 €</span>
+                                    <span class="text-[9px] text-gray-500 mt-1">Základný plat + príplatky a odmeny</span>
+                                </div>
+                                <div class="bg-[#90CAF9]/5 border border-[#90CAF9]/30 p-4 rounded-2xl flex flex-col justify-center shadow-inner">
+                                    <span class="text-[10px] font-bold text-[#90CAF9] uppercase tracking-wider">Čistá mzda na účet (Čisté)</span>
+                                    <span id="salary-netto" class="text-3xl font-extrabold text-[#90CAF9] mt-1">0,00 €</span>
+                                    <span class="text-[9px] text-gray-500 mt-1">Po odpočítaní daní a poistného</span>
+                                </div>
+                            </div>
+
+                            <!-- Expandable detailed premium tables -->
+                            <div id="salary-details-expanded-panel" class="hidden space-y-4 pt-4 border-t border-[#233044] animate-in fade-in duration-200">
+                                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Rozpis mzdových zložiek</h4>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                                    <!-- Left column: Allowances/Premiums -->
+                                    <div class="space-y-2.5">
+                                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest pb-1 border-b border-[#233044]">Príjmové položky (Brutto)</div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Základný tarifný plat (odpracované):</span>
+                                            <strong id="item-base-wage" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Osobné ohodnotenie (alikvotné):</span>
+                                            <strong id="item-personal-allowance" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Nočný príplatok (25%):</span>
+                                            <strong id="item-premium-night" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Sobotný príplatok (30%):</span>
+                                            <strong id="item-premium-saturday" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Nedeľný príplatok (100%):</span>
+                                            <strong id="item-premium-sunday" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Sviatočný príplatok (100%):</span>
+                                            <strong id="item-premium-holiday" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Príplatok za nadčasy (30%):</span>
+                                            <strong id="item-premium-overtime" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Príplatok iné (smerový):</span>
+                                            <strong id="item-premium-other" class="text-white">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Finančný príspevok na stravné (oslobodené):</span>
+                                            <strong id="item-meal-contribution" class="text-emerald-400">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Náhrada príjmu pri PN / Dovolenka:</span>
+                                            <strong id="item-absences-pay" class="text-white">0,00 €</strong>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right column: Insurance/Taxes -->
+                                    <div class="space-y-2.5">
+                                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest pb-1 border-b border-[#233044]">Zrážky, Dane & Odvody</div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Zdravotné poistenie (4,0%):</span>
+                                            <strong class="text-red-400" id="item-insurance-health">- 0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Sociálne poistenie (9,4%):</span>
+                                            <strong class="text-red-400" id="item-insurance-social">- 0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Odvody spolu (13,4%):</span>
+                                            <strong class="text-red-400" id="item-insurance-total">- 0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Nezdaniteľná časť (NČZD 2026):</span>
+                                            <strong class="text-gray-400" id="item-tax-free-nczd">492,20 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Základ dane (taxBase):</span>
+                                            <strong class="text-white" id="item-tax-base">0,00 €</strong>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-[#233044]/40 text-gray-300">
+                                            <span>Preddavok na daň (19%):</span>
+                                            <strong class="text-red-400" id="item-tax-income">- 0,00 €</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Salary inputs & defaults Settings Panel (Spans 1 col) -->
+                        <div class="bg-[#151D2A] border border-[#233044] rounded-3xl p-6 shadow-md space-y-4">
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[#90CAF9]">payments</span>
+                                Nastavenia sadzieb výplaty
+                            </h3>
+                            <p class="text-[11px] text-gray-400">Prispôsobte si mzdové tarify pre výpočet čistého odhadu</p>
+                            
+                            <div class="space-y-3 pt-2 text-xs">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Tarifný základný plat (Brutto €)</label>
+                                    <input id="salary-input-tariff" type="number" step="0.01" value="936.50" oninput="window.updateSalaryConfig('tariffSalary', this.value)" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-white font-bold focus:outline-none focus:border-[#90CAF9] transition">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Osobné ohodnotenie (€)</label>
+                                    <input id="salary-input-personal" type="number" step="0.01" value="380.00" oninput="window.updateSalaryConfig('personalAllowance', this.value)" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-white font-bold focus:outline-none focus:border-[#90CAF9] transition">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Príplatok iné (€)</label>
+                                    <input id="salary-input-other" type="number" step="0.01" value="40.00" oninput="window.updateSalaryConfig('shiftAllowance', this.value)" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-white font-bold focus:outline-none focus:border-[#90CAF9] transition">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Dovolenka (nárok dni)</label>
+                                        <input id="salary-input-vacation-allowance" type="number" step="0.5" value="25.0" oninput="window.updateSalaryConfig('vacationAllowance', this.value)" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-white font-bold focus:outline-none focus:border-[#90CAF9] transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Príspevok stravné (€/deň)</label>
+                                        <input id="salary-input-meal-rate" type="number" step="0.01" value="4.34" oninput="window.updateSalaryConfig('mealRate', this.value)" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-white font-bold focus:outline-none focus:border-[#90CAF9] transition">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right column: Modern instructions card -->
-                <div class="lg:col-span-5 bg-brand-slate/80 border border-gray-800/80 rounded-2xl p-5 md:p-6 shadow-xl">
-                    <h3 class="text-base font-bold text-white flex items-center gap-2 mb-4 border-b border-gray-800 pb-3">
-                        <span class="material-symbols-outlined text-brand-accent">info</span>
-                        Rýchly návod na inštaláciu:
+                <!-- Sub Tab 3: Prehľad Mesiaca (Chronological List) -->
+                <div id="subtab-overview" class="bg-[#151D2A] border border-[#233044] rounded-3xl p-6 shadow-lg space-y-4 hidden animate-in fade-in duration-200">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[#90CAF9]">format_list_bulleted</span>
+                        Prehľadný súpis dní v mesiaci a poznámok
                     </h3>
                     
-                    <ul class="space-y-4">
-                        <li class="flex items-start gap-3">
-                            <div class="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                                1
+                    <div id="my-overview-list-container" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <!-- Filled dynamically via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 2: CELKOVÝ ROZPIS (ROZPIS SPREADSHEET EDITOR) -->
+            <section id="view-rozpis" class="space-y-6 hidden">
+                <!-- STEP 1: Firebase Configuration (Collapsible) -->
+                <section id="firebase-config-section" class="bg-[#151D2A] border border-[#233044] rounded-3xl p-5 shadow-lg backdrop-blur-sm">
+                    <div class="flex justify-between items-center cursor-pointer" onclick="toggleSection('firebase-config-body')">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-[#90CAF9] text-2xl">settings_applications</span>
+                            <h2 class="text-base sm:text-lg font-bold text-white">1. Nastavenia pripojenia Firebase Cloud Database</h2>
+                        </div>
+                        <span id="firebase-config-arrow" class="material-symbols-outlined text-gray-500 transform transition-transform duration-200">expand_less</span>
+                    </div>
+
+                    <div id="firebase-config-body" class="mt-5 space-y-4 transition-all duration-300">
+                        <p class="text-xs text-gray-400 leading-relaxed">
+                            Zadaním vašich Firebase Firestore SDK konfigurácií v reálnom čase zosynchronizujete tabuľku s mobilnými aplikáciami príslušníkov. Nastavenia zostávajú bezpečne uložené vo vašom lokálnom prehliadači (localStorage).
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">API Key</label>
+                                <input id="firebase-apiKey" type="password" placeholder="AIzaSy..." class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#90CAF9] transition">
                             </div>
-                            <div class="text-xs md:text-sm text-gray-300">
-                                <strong class="text-white">Stiahnite súbor</strong><br>
-                                Kliknite na modré tlačidlo vľavo a uložte súbor <code class="bg-brand-navy px-1 rounded text-brand-accent text-[11px]">Sichter.apk</code>.
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Auth Domain</label>
+                                <input id="firebase-authDomain" type="text" placeholder="project-id.firebaseapp.com" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#90CAF9] transition">
                             </div>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                                2
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Project ID</label>
+                                <input id="firebase-projectId" type="text" placeholder="project-id" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#90CAF9] transition">
                             </div>
-                            <div class="text-xs md:text-sm text-gray-300">
-                                <strong class="text-white">Povolte neznáme zdroje</strong><br>
-                                Ak vás systém Android pri otvorení upozorní, v nastaveniach prehliadača alebo správcu súborov povoľte inštaláciu aplikácií z tohto zdroja.
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Storage Bucket</label>
+                                <input id="firebase-storageBucket" type="text" placeholder="project-id.appspot.com" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#90CAF9] transition">
                             </div>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                                3
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Messaging Sender ID</label>
+                                <input id="firebase-messagingSenderId" type="text" placeholder="8473205739" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#90CAF9] transition">
                             </div>
-                            <div class="text-xs md:text-sm text-gray-300">
-                                <strong class="text-white">Dokončite inštaláciu</strong><br>
-                                Potvrďte kliknutím na <strong class="text-brand-accent">Inštalovať</strong>. Aplikácia sa pridá na vašu plochu a môžete ju začať plne využívať!
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">App ID</label>
+                                <input id="firebase-appId" type="password" placeholder="1:8473205739:web:9f..." class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#90CAF9] transition">
                             </div>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </section>
+                        </div>
 
-        <!-- Tabs Navigation -->
-        <div class="flex border-b border-gray-800 space-x-2">
-            <div class="px-6 py-3 font-semibold text-sm rounded-t-xl flex items-center gap-2 border-b-2 border-brand-primary text-brand-primary bg-brand-navy/30">
-                <span class="material-symbols-outlined text-lg">calendar_view_month</span>
-                Rozpis smien
-            </div>
-        </div>
-
-        <div id="web-tab-roster-content" class="space-y-8">
-
-        <!-- STEP 1: Firebase configuration interface -->
-        <section id="firebase-config-section" class="bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm">
-            <div class="flex justify-between items-center cursor-pointer" onclick="toggleSection('firebase-config-body')">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-brand-primary text-2xl">settings_applications</span>
-                    <h2 class="text-xl font-bold text-white">1. Nastavenia pripojenia Firebase</h2>
-                </div>
-                <span id="firebase-config-arrow" class="material-symbols-outlined text-gray-500 transform transition-transform duration-200">expand_less</span>
-            </div>
-
-            <div id="firebase-config-body" class="mt-6 space-y-4 transition-all duration-300">
-                <p class="text-sm text-gray-300">
-                    Pre zápis zmien do Firestore a odosielanie push správ zadajte vašu webovú konfiguráciu z projektu Firebase. Konfigurácia sa ukladá bezpečne lokálne vo vašom prehliadači (localStorage).
-                </p>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">API Key</label>
-                        <input id="firebase-apiKey" type="password" placeholder="AIzaSy..." class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Auth Domain</label>
-                        <input id="firebase-authDomain" type="text" placeholder="project-id.firebaseapp.com" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Project ID</label>
-                        <input id="firebase-projectId" type="text" placeholder="project-id" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Storage Bucket</label>
-                        <input id="firebase-storageBucket" type="text" placeholder="project-id.appspot.com" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Messaging Sender ID</label>
-                        <input id="firebase-messagingSenderId" type="text" placeholder="8473205739" class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">App ID</label>
-                        <input id="firebase-appId" type="password" placeholder="1:8473205739:web:9f..." class="w-full bg-brand-slate/80 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-gray-800">
-                    <div class="flex items-center gap-2">
-                        <input id="remember-config" type="checkbox" checked class="h-4.5 w-4.5 text-brand-primary focus:ring-brand-primary border-gray-700 rounded bg-brand-slate">
-                        <label for="remember-config" class="text-sm text-gray-300">Zapamätať nastavenia v tomto prehliadači</label>
-                    </div>
-                    <div class="flex gap-3">
-                        <button onclick="clearSavedConfig()" class="px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/60 rounded-xl transition">
-                            Vyčistiť pamäť
-                        </button>
-                        <button id="btn-connect" onclick="initializeFirebaseApp()" class="bg-brand-primary hover:bg-brand-secondary text-brand-slate font-semibold px-5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-brand-primary/10">
-                            <span class="material-symbols-outlined text-lg font-bold">cloud_sync</span>
-                            Pripojiť k Firebase
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- STEP 2: Roster configuration filters -->
-        <section class="bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm space-y-6">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-brand-primary text-2xl">calendar_view_month</span>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">2. Výber aktívneho mesiaca a stavu</h2>
-                        <p class="text-xs text-gray-400">Vyberte mesiac, ktorý plánujete spravovať alebo zverejniť</p>
-                    </div>
-                </div>
-
-                <!-- Sync status from Firebase indicator -->
-                <div id="firebase-status-banner" class="hidden flex items-center gap-2 bg-emerald-950/40 text-emerald-400 border border-emerald-900 px-4 py-2 rounded-xl text-sm">
-                    <span class="material-symbols-outlined text-base">cloud_done</span>
-                    Zmeny sa automaticky ukladajú do cloudu (Firestore)
-                </div>
-            </div>
-
-            <!-- Keep hidden select inputs to maintain DOM element compatibility with any standard layout checks -->
-            <select id="role-selector" class="hidden"><option value="zamestnanec">zamestnanec</option></select>
-            <div id="emp-selector-div" class="hidden"><select id="emp-selector"></select></div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-gray-800">
-                <!-- Month selector dropdown -->
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Výber mesiaca</label>
-                    <div class="relative">
-                        <select id="month-selector" onchange="onMonthSelected()" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-3 text-white appearance-none focus:outline-none focus:border-brand-primary transition pr-10">
-                            <option value="0">December 2025 (Pôvodný)</option>
-                            <option value="1" selected>Január 2026</option>
-                            <option value="2">Február 2026</option>
-                            <option value="3">Marec 2026</option>
-                            <option value="4">Apríl 2026</option>
-                            <option value="5">Máj 2026</option>
-                            <option value="6">Jún 2026</option>
-                            <option value="7">Júl 2026</option>
-                            <option value="8">August 2026</option>
-                            <option value="9">September 2026</option>
-                            <option value="10">Október 2026</option>
-                            <option value="11">November 2026</option>
-                            <option value="12">December 2026</option>
-                        </select>
-                        <span class="material-symbols-outlined absolute right-3 top-3.5 text-gray-400 pointer-events-none">expand_more</span>
-                    </div>
-                </div>
-
-                <!-- Published switch status -->
-                <div class="admin-only bg-brand-slate/40 border border-gray-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Stav zverejnenia rozpisu</h4>
-                        <div class="mt-2 flex items-center">
-                            <span id="publish-status-badge" class="px-3 py-1.5 text-[11px] font-bold rounded-xl uppercase tracking-wider border transition-all duration-300 bg-red-500/10 text-red-100 border-red-500/20 shadow-inner">
-                                Nezverejnený (pracovná verzia)
-                            </span>
+                        <div class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-[#233044]">
+                            <div class="flex items-center gap-2">
+                                <input id="remember-config" type="checkbox" checked class="h-4 w-4 text-[#90CAF9] focus:ring-[#90CAF9] border-gray-700 rounded bg-[#0B1220]">
+                                <label for="remember-config" class="text-xs text-gray-400">Zapamätať konfiguračné parametre v tomto prehliadači</label>
+                            </div>
+                            <div class="flex gap-3">
+                                <button onclick="clearSavedConfig()" class="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition">
+                                    Vyčistiť pamäť
+                                </button>
+                                <button id="btn-connect" onclick="initializeFirebaseApp()" class="bg-[#90CAF9] hover:bg-[#42A5F5] text-[#0B1220] font-extrabold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-lg shadow-[#90CAF9]/15">
+                                    <span class="material-symbols-outlined text-sm font-bold">cloud_sync</span>
+                                    Pripojiť k Firebase Firestore
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <!-- Kept hidden checkbox to preserve compatibility if anything else queries it -->
-                    <input type="checkbox" id="month-published-checkbox" onchange="onPublishStateChanged()" class="hidden">
-                </div>
+                </section>
 
-                <!-- Fast database action buttons -->
-                <div class="flex items-end">
-                    <button onclick="saveRosterToFirestore()" id="btn-save-remote" class="admin-only w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20">
-                        <span class="material-symbols-outlined text-lg">public</span>
-                        Zverejniť Rozpis
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Employee View Notice Banner -->
-        <div id="employee-view-banner" class="hidden bg-amber-950/20 border border-amber-900/50 text-amber-300 rounded-2xl p-4 flex items-center gap-3 mb-6">
-            <span class="material-symbols-outlined text-xl shrink-0 text-amber-400">visibility</span>
-            <div class="text-sm">
-                <span class="font-semibold text-white">Prehliadací režim zamestnanca:</span> Momentálne sledujete rozpis pre príslušníka <span id="logged-employee-name-notice" class="font-bold text-brand-primary">--</span>. Všetky administratívne úpravy, zmeny smien, reusporiadanie a posielanie push správ sú uzamknuté.
-            </div>
-        </div>
-
-        <!-- STEP 3: Roster Planner Grid Editor -->
-        <section class="bg-brand-navy/60 border border-gray-800 rounded-2xl shadow-md backdrop-blur-sm overflow-hidden">
-            <!-- Table Header info -->
-            <div class="px-6 py-5 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-brand-navy/90">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-brand-primary text-2xl">table_chart</span>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">3. Rozvrh smien a priradení smien</h2>
-                        <p class="text-xs text-gray-400">Kliknutím na ľubovoľnú bunku zamestnanca okamžite zmeníte jej typ</p>
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="openAddEmployeeModal()" class="admin-only bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/20 rounded-xl px-4 py-2 text-sm font-medium transition flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-base">person_add</span> Pridať zamestnanca
-                    </button>
-                    <button onclick="resetRosterToFallback()" class="admin-only bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl px-4 py-2 text-sm font-medium transition flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-base">restart_alt</span> Obnoviť predvolené
-                    </button>
-                </div>
-            </div>
-
-            <!-- Interative Roster Sheet Container with horizontal/vertical scroll and sticky headers -->
-            <div class="max-h-[75vh] overflow-auto custom-scrollbar">
-                <table class="w-full text-left border-collapse table-fixed min-w-[1200px]">
-                    <thead class="sticky top-0 z-30 bg-brand-navy text-xs font-semibold text-gray-400 border-b border-gray-800 shadow-md">
-                        <tr id="roster-header-days">
-                            <!-- Populated dynamically via JS -->
-                        </tr>
-                        <tr id="roster-header-weeks" class="border-b border-gray-800">
-                            <!-- Populated dynamically via JS -->
-                        </tr>
-                    </thead>
-                    <!-- SECTION 1: TOP GROUP (Denní zamestnanci) -->
-                    <tbody class="divide-y divide-gray-800/40 text-sm">
-                        <tr class="bg-brand-slate/80 select-none">
-                            <td colspan="36" class="px-4 py-2 font-bold text-xs uppercase tracking-wider text-brand-primary/80 bg-brand-slate/90">
-                                ☀️ Denná skupina / Služobné zaradenia
-                            </td>
-                        </tr>
-                        <tr id="empty-top-state" class="hidden">
-                            <td colspan="36" class="px-6 py-4 text-center text-gray-500 italic">Žiadni zamestnanci v dennej skupine</td>
-                        </tr>
-                    </tbody>
-                    <!-- Employee rows generated dynamically -->
-                    <tbody class="divide-y divide-gray-800/40 text-sm" id="top-group-rows"></tbody>
-
-                    <!-- SECTION 2: BOTTOM GROUP (Smenári/Noční zamestnanci) -->
-                    <tbody class="divide-y divide-gray-800/40 text-sm">
-                        <tr class="bg-brand-slate/80 select-none">
-                            <td colspan="36" class="px-4 py-2 font-bold text-xs uppercase tracking-wider text-brand-accent/80 bg-brand-slate/90">
-                                🔄 Zmenová skupina / Nepretržitá prevádzka (Smeny 1,2,3,4)
-                            </td>
-                        </tr>
-                        <tr id="empty-bottom-state" class="hidden">
-                            <td colspan="36" class="px-6 py-4 text-center text-gray-500 italic">Žiadni zamestnanci v zmenovej skupine</td>
-                        </tr>
-                    </tbody>
-                    <!-- Employee rows generated dynamically -->
-                    <tbody class="divide-y divide-gray-800/40 text-sm" id="bottom-group-rows"></tbody>
-
-                    <!-- SECTION 3: DAILY PATROL COUNTS (Denný počet hliadok) -->
-                    <tbody class="divide-y divide-gray-800/40 text-sm" id="patrol-counts-rows"></tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- STEP 4: Communications & Messaging (Správy a Oznámenia) -->
-        <section class="w-full">
-            <div class="admin-only bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm space-y-4">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-brand-primary text-2xl">mail</span>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">4. Interné Správy a Oznamy</h2>
-                        <p class="text-xs text-gray-400">Poslať správy zamestnancom s očakávaným potvrdením prečítania</p>
-                    </div>
-                </div>
-
-                <div class="pt-4 border-t border-gray-800 space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Komu odoslať (Prijímateľ)</label>
-                            <div class="relative">
-                                <select id="msg-target-type" onchange="window.onMessageTargetTypeChanged()" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition pr-10">
-                                    <option value="all">Všetkým (Everyone)</option>
-                                    <option value="shift">Zvolenej skupine/smene</option>
-                                    <option value="individual">Jednotlivcovi</option>
-                                </select>
-                                <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none">expand_more</span>
+                <!-- STEP 2: Month Selector & Publication Status Bar -->
+                <section class="bg-[#151D2A] border border-[#233044] rounded-3xl p-5 shadow-lg space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-[#233044] pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-[#90CAF9] text-2xl">calendar_view_month</span>
+                            <div>
+                                <h2 class="text-base sm:text-lg font-bold text-white">2. Výber mesiaca, verzie a zverejnenie</h2>
+                                <p class="text-xs text-gray-400">Spravujte alebo zverejňujte špecifický mesačný rozpis</p>
                             </div>
                         </div>
                         
-                        <div id="msg-target-value-container" class="hidden">
-                            <label id="msg-target-value-label" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Vyberte upresnenie</label>
-                            <div class="relative">
-                                <select id="msg-target-value" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition pr-10 font-bold text-brand-accent">
-                                    <!-- Populated dynamically via JS -->
-                                </select>
-                                <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none">expand_more</span>
-                            </div>
+                        <!-- Auto-save alert display banner -->
+                        <div id="firebase-status-banner" class="hidden flex items-center gap-2 bg-emerald-950/40 text-emerald-400 border border-emerald-900/40 px-4 py-2 rounded-xl text-xs font-semibold">
+                            <span class="material-symbols-outlined text-sm">cloud_done</span>
+                            Real-time prepojenie s Cloud Firestore je AKTÍVNE
                         </div>
+                    </div>
 
+                    <!-- Hidden controls to keep legacy DOM selector compatibility -->
+                    <select id="role-selector" class="hidden"><option value="zamestnanec">zamestnanec</option></select>
+                    <div id="emp-selector-div" class="hidden"><select id="emp-selector"></select></div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                        <!-- Dropdown choice -->
                         <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Priorita správy</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Výber aktívneho mesiaca</label>
                             <div class="relative">
-                                <select id="msg-priority" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition pr-10">
-                                    <option value="high">1. Vysoká</option>
-                                    <option value="normal" selected>2. Bežná</option>
+                                <select id="month-selector" onchange="onMonthSelected()" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-3 text-xs text-white appearance-none focus:outline-none focus:border-[#90CAF9] transition pr-10 font-extrabold">
+                                    <option value="0">December 2025 (Pôvodný)</option>
+                                    <option value="1" selected>Január 2026</option>
+                                    <option value="2">Február 2026</option>
+                                    <option value="3">Marec 2026</option>
+                                    <option value="4">Apríl 2026</option>
+                                    <option value="5">Máj 2026</option>
+                                    <option value="6">Jún 2026</option>
+                                    <option value="7">Júl 2026</option>
+                                    <option value="8">August 2026</option>
+                                    <option value="9">September 2026</option>
+                                    <option value="10">Október 2026</option>
+                                    <option value="11">November 2026</option>
+                                    <option value="12">December 2026</option>
                                 </select>
-                                <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none">expand_more</span>
+                                <span class="material-symbols-outlined absolute right-3 top-3.5 text-gray-400 pointer-events-none">expand_more</span>
                             </div>
                         </div>
-                    </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Titulok správy</label>
-                        <input id="msg-title" type="text" placeholder="Napr. Dôležitý oznam pre zamestnancov" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Obsah správy</label>
-                        <textarea id="msg-body" rows="3" placeholder="Sem napíšte text správy..." class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-primary transition"></textarea>
-                    </div>
-
-                    <div class="flex justify-end pt-2">
-                        <button onclick="window.sendTargetedMessage()" id="btn-send-msg" class="bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold px-6 py-3 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-brand-primary/10">
-                            <span class="material-symbols-outlined text-lg font-bold">send</span>
-                            Odoslať Správu
-                        </button>
-                    </div>
-
-                    <!-- SENT MESSAGES MONITOR -->
-                    <div class="pt-6 border-t border-gray-800 space-y-3">
-                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                            <span class="material-symbols-outlined text-sm text-brand-accent">history</span>
-                            História správ a potvrdenie o prečítaní (Admin manažment)
-                        </h3>
-                        <div id="sent-messages-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                            <p class="text-xs text-gray-500 italic">Načítavam zoznam správ...</p>
+                        <!-- Published Badge Box -->
+                        <div class="admin-only bg-[#0B1220]/60 border border-[#233044] rounded-2xl p-4 flex items-center justify-between gap-4">
+                            <div>
+                                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">Stav rozpisu v cloude</h4>
+                                <div class="mt-2.5">
+                                    <span id="publish-status-badge" class="px-3 py-1.5 text-[10px] font-extrabold rounded-xl uppercase tracking-wider border bg-red-500/10 text-red-500 border-red-500/20 shadow-inner">
+                                        Nezverejnený (Pracovná verzia)
+                                    </span>
+                                </div>
+                            </div>
+                            <input type="checkbox" id="month-published-checkbox" onchange="onPublishStateChanged()" class="hidden">
                         </div>
+
+                        <!-- Cloud Publish Trigger Button -->
+                        <div class="flex items-end">
+                            <button onclick="saveRosterToFirestore()" id="btn-save-remote" class="admin-only w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-6 py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20">
+                                <span class="material-symbols-outlined text-base">public</span>
+                                Uložiť & Zverejniť rozpis v Cloude
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Employee view Notice message -->
+                <div id="employee-view-banner" class="hidden bg-amber-950/20 border border-amber-900/50 text-amber-300 rounded-2xl p-4 flex items-center gap-3">
+                    <span class="material-symbols-outlined text-xl shrink-0 text-amber-400">visibility</span>
+                    <div class="text-xs">
+                        <span class="font-bold text-white">Režim obmedzeného prezerania:</span> Sledujete rozpis pre príslušníka <span id="logged-employee-name-notice" class="font-bold text-[#90CAF9]">--</span>. Všetky administratorské tlačidlá sú uzamknuté. Vlastné služby, poznámky a nadčasy upravujte výhradne cez sekciu **Moje zmeny**.
                     </div>
                 </div>
-            </div>
+
+                <!-- STEP 3: Full Team spreadsheet Grid -->
+                <section class="bg-[#151D2A] border border-[#233044] rounded-3xl shadow-lg overflow-hidden">
+                    <div class="px-6 py-5 border-b border-[#233044] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#151D2A]/60">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-[#90CAF9] text-2xl">table_chart</span>
+                            <div>
+                                <h2 class="text-base sm:text-lg font-bold text-white">3. Matrica rozpisu smien a hliadok</h2>
+                                <p class="text-xs text-gray-400">Pre úpravu služby kliknite na príslušnú bunku v tabuľke</p>
+                            </div>
+                        </div>
+
+                        <!-- Spreadsheet Actions -->
+                        <div class="flex flex-wrap gap-2.5">
+                            <button onclick="openAddEmployeeModal()" class="admin-only bg-[#90CAF9]/10 hover:bg-[#90CAF9]/20 text-[#90CAF9] border border-[#90CAF9]/20 rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-base">person_add</span> Pridať príslušníka
+                            </button>
+                            <button onclick="resetRosterToFallback()" class="admin-only bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-base">restart_alt</span> Obnoviť do fallbacku
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scrollable spreadsheet wrapper -->
+                    <div class="max-h-[60vh] overflow-auto custom-scrollbar">
+                        <table class="w-full text-left border-collapse table-fixed min-w-[1200px]">
+                            <thead class="sticky top-0 z-30 bg-[#151D2A] text-[10px] font-bold text-gray-400 border-b border-[#233044] shadow-md">
+                                <tr id="roster-header-days">
+                                    <!-- Populated dynamically via JS -->
+                                </tr>
+                                <tr id="roster-header-weeks" class="border-b border-[#233044]">
+                                    <!-- Populated dynamically via JS -->
+                                </tr>
+                            </thead>
+                            
+                            <!-- Section: TOP employees -->
+                            <tbody class="divide-y divide-[#233044]/30 text-xs">
+                                <tr class="bg-[#0B1220]/60 select-none">
+                                    <td colspan="36" class="px-4 py-2.5 font-extrabold text-[10px] uppercase tracking-wider text-[#90CAF9]/90 bg-[#0B1220]/80">
+                                        ☀️ Denná skupina / Služobné zaradenia
+                                    </td>
+                                </tr>
+                                <tr id="empty-top-state" class="hidden">
+                                    <td colspan="36" class="px-6 py-4 text-center text-gray-500 italic bg-[#151D2A]">Žiadni zamestnanci v dennej skupine</td>
+                                </tr>
+                            </tbody>
+                            <tbody class="divide-y divide-[#233044]/30 text-xs" id="top-group-rows"></tbody>
+
+                            <!-- Section: BOTTOM employees -->
+                            <tbody class="divide-y divide-[#233044]/30 text-xs">
+                                <tr class="bg-[#0B1220]/60 select-none">
+                                    <td colspan="36" class="px-4 py-2.5 font-extrabold text-[10px] uppercase tracking-wider text-orange-400/90 bg-[#0B1220]/80">
+                                        🔄 Zmenová skupina / Nepretržitá prevádzka (Smeny 1,2,3,4)
+                                    </td>
+                                </tr>
+                                <tr id="empty-bottom-state" class="hidden">
+                                    <td colspan="36" class="px-6 py-4 text-center text-gray-500 italic bg-[#151D2A]">Žiadni zamestnanci v zmenovej skupine</td>
+                                </tr>
+                            </tbody>
+                            <tbody class="divide-y divide-[#233044]/30 text-xs" id="bottom-group-rows"></tbody>
+
+                            <!-- Section: COUNTS -->
+                            <tbody class="divide-y divide-[#233044]/30 text-xs" id="patrol-counts-rows"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- STEP 4: Messaging & Communications -->
+                <section class="w-full">
+                    <div class="admin-only bg-[#151D2A] border border-[#233044] rounded-3xl p-5 shadow-lg space-y-4">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-[#90CAF9] text-2xl">mail</span>
+                            <div>
+                                <h2 class="text-base sm:text-lg font-bold text-white">4. Interné Správy a Oznamy príslušníkom</h2>
+                                <p class="text-xs text-gray-400">Uverejnite správy alebo oznamy s potvrdzovaním o prečítaní</p>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-[#233044] space-y-4 text-xs">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Prijímateľ správy</label>
+                                    <div class="relative">
+                                        <select id="msg-target-type" onchange="window.onMessageTargetTypeChanged()" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#90CAF9] transition pr-10 font-bold">
+                                            <option value="all">Všetkým (Everyone)</option>
+                                            <option value="shift">Zvolenej skupine/smene</option>
+                                            <option value="individual">Jednotlivcovi</option>
+                                        </select>
+                                        <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none text-sm">expand_more</span>
+                                    </div>
+                                </div>
+                                
+                                <div id="msg-target-value-container" class="hidden">
+                                    <label id="msg-target-value-label" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Vyberte upresnenie</label>
+                                    <div class="relative">
+                                        <select id="msg-target-value" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#90CAF9] transition pr-10 font-bold text-[#90CAF9]">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                        <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none text-sm">expand_more</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Priorita oznamu</label>
+                                    <div class="relative">
+                                        <select id="msg-priority" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#90CAF9] transition pr-10 font-bold">
+                                            <option value="high">Vysoká (Červená)</option>
+                                            <option value="normal" selected>Bežná (Modrá)</option>
+                                        </select>
+                                        <span class="material-symbols-outlined absolute right-3 top-3 text-gray-400 pointer-events-none text-sm">expand_more</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Titulok oznámenia</label>
+                                <input id="msg-title" type="text" placeholder="Napr. Dôležitý oznam k novoročným službám" class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#90CAF9] transition">
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Obsah oznámenia</label>
+                                <textarea id="msg-body" rows="3" placeholder="Sem napíšte podrobný text správy..." class="w-full bg-[#0B1220] border border-[#233044] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#90CAF9] transition"></textarea>
+                            </div>
+
+                            <div class="flex justify-end pt-2">
+                                <button onclick="window.sendTargetedMessage()" id="btn-send-msg" class="bg-[#90CAF9] hover:bg-[#42A5F5] text-[#0B1220] font-extrabold px-6 py-3 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-[#90CAF9]/15">
+                                    <span class="material-symbols-outlined text-base font-bold">send</span>
+                                    Odoslať a Upozorniť mobilné appky
+                                </button>
+                            </div>
+
+                            <!-- SENT HISTORIC LIST -->
+                            <div class="pt-5 border-t border-[#233044] space-y-3">
+                                <h3 class="text-xs font-bold text-white flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-sm text-[#90CAF9]">history</span>
+                                    História správ a potvrdenia o prečítaní (Real-time monitoring)
+                                </h3>
+                                <div id="sent-messages-list" class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <p class="text-xs text-gray-500 italic">Načítavam zoznam uverejnených správ...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
         </section>>� Push Notifikáciu
         <!-- Firestore Database schema documentation & instructions -->
         <section id="db-docs" class="bg-brand-navy/60 border border-gray-800 rounded-2xl p-6 shadow-md backdrop-blur-sm space-y-4">
