@@ -422,8 +422,8 @@ fun LoginScreen(
                                 if (matchedEmployee == null) {
                                     errorMessage = "Zadané meno sa v rozpise nenachádza."
                                 } else {
-                                    val savedPassword = prefs.getString("roster_login_password", "") ?: ""
-                                    if (passwordInput == savedPassword && passwordInput.isNotBlank()) {
+                                    val savedPassword = prefs.getString("roster_login_password", "123456").orEmpty().ifEmpty { "123456" }
+                                    if (passwordInput == savedPassword) {
                                         prefs.edit()
                                             .putBoolean("is_logged_in", true)
                                             .putString("logged_in_user_name", matchedEmployee)

@@ -84,6 +84,15 @@ class ExampleRobolectricTest {
     composeTestRule.onNodeWithTag("settings_cleaner_switch").performClick()
     composeTestRule.waitForIdle()
 
+    // Expand financial settings
+    composeTestRule.onNodeWithTag("settings_financial_toggle_card").performScrollTo().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("settings_tariff_salary_input").performScrollTo().assertIsDisplayed()
+
+    // Collapse financial settings
+    composeTestRule.onNodeWithTag("settings_financial_toggle_card").performScrollTo().performClick()
+    composeTestRule.waitForIdle()
+
     // Click close setting button
     composeTestRule.onNodeWithTag("settings_close_btn").performClick()
     composeTestRule.waitForIdle()

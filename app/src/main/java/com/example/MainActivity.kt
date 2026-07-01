@@ -1800,7 +1800,7 @@ fun SettingsDialog(
     val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
     
     var isFinancialSettingsExpanded by remember { mutableStateOf(false) }
-    var editPasswordInput by remember { mutableStateOf(prefs.getString("roster_login_password", "") ?: "") }
+    var editPasswordInput by remember { mutableStateOf(prefs.getString("roster_login_password", "123456").orEmpty().ifEmpty { "123456" }) }
     var changeSuccessMessage by remember { mutableStateOf<String?>(null) }
     var changeErrorMessage by remember { mutableStateOf<String?>(null) }
     var rosterEmailInput by remember { mutableStateOf(prefs.getString("user_email", "") ?: "") }
@@ -2630,7 +2630,7 @@ fun RosterSettingsDialog(
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
-    var editPasswordInput by remember { mutableStateOf(prefs.getString("roster_login_password", "") ?: "") }
+    var editPasswordInput by remember { mutableStateOf(prefs.getString("roster_login_password", "123456").orEmpty().ifEmpty { "123456" }) }
     var changeSuccessMessage by remember { mutableStateOf<String?>(null) }
     var changeErrorMessage by remember { mutableStateOf<String?>(null) }
 
