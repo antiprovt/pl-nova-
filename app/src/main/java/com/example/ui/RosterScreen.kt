@@ -385,6 +385,21 @@ fun RosterScreen(modifier: Modifier = Modifier) {
                     singleLine = true
                 )
 
+                Button(
+                    onClick = {
+                        val html = generateRosterPrintHtml(RosterData.activeRosterMonth)
+                        printHtml(context, html, "Rozpis_${RosterData.activeRosterMonth}_2026")
+                    },
+                    modifier = Modifier.height(48.dp).testTag("print_roster_btn"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Text("Tlačiť / PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
                 if (canEditThisMonth) {
                     var showAddDialog by remember { mutableStateOf(false) }
 

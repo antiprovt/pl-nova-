@@ -911,7 +911,18 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 MonthSelectorHeader(
                     selectedMonth = selectedMonth,
                     onPreviousMonth = { viewModel.previousMonth() },
-                    onNextMonth = { viewModel.nextMonth() }
+                    onNextMonth = { viewModel.nextMonth() },
+                    onPrintClick = {
+                        val mappedIndex = if (selectedMonth.year == 2025 && selectedMonth.monthValue == 12) {
+                            0
+                        } else if (selectedMonth.year == 2026 && selectedMonth.monthValue in 1..12) {
+                            selectedMonth.monthValue
+                        } else {
+                            1
+                        }
+                        val html = com.example.ui.generateCalendarPrintHtml(context, mappedIndex, allShiftDays, isCleanerModeEnabled)
+                        com.example.ui.printHtml(context, html, "Sichter_${selectedMonth.monthValue}_${selectedMonth.year}")
+                    }
                 )
             }
 
@@ -1372,7 +1383,8 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
 fun MonthSelectorHeader(
     selectedMonth: YearMonth,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    onNextMonth: () -> Unit,
+    onPrintClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -1403,13 +1415,30 @@ fun MonthSelectorHeader(
 
             val monthNameSlovak = getSlovakMonthName(selectedMonth.monthValue)
             
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "$monthNameSlovak ${selectedMonth.year}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "$monthNameSlovak ${selectedMonth.year}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                IconButton(
+                    onClick = onPrintClick,
+                    modifier = Modifier.size(36.dp).testTag("print_calendar_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Tlačiť / PDF",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             IconButton(

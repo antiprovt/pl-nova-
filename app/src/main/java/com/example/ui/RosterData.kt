@@ -1894,3 +1894,248 @@ data class CellColors(
     val background: Color,
     val text: Color
 )
+
+fun printHtml(context: android.content.Context, htmlContent: String, jobName: String) {
+    val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    mainHandler.post {
+        val webView = android.webkit.WebView(context)
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageFinished(view: android.webkit.WebView, url: String) {
+                val printManager = context.getSystemService(android.content.Context.PRINT_SERVICE) as android.print.PrintManager
+                val printAdapter = view.createPrintDocumentAdapter(jobName)
+                printManager.print(
+                    jobName,
+                    printAdapter,
+                    android.print.PrintAttributes.Builder().build()
+                )
+            }
+        }
+        webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+    }
+}
+
+fun generateRosterPrintHtml(monthIndex: Int): String {
+    val ym = RosterData.getYearMonthForIndex(monthIndex)
+    val monthName = when (monthIndex) {
+        0 -> "December 2025"
+        1 -> "Január 2026"
+        2 -> "Február 2026"
+        3 -> "Marec 2026"
+        4 -> "Apríl 2026"
+        5 -> "Máj 2026"
+        6 -> "Jún 2026"
+        7 -> "Júl 2026"
+        8 -> "August 2026"
+        9 -> "September 2026"
+        10 -> "Október 2026"
+        11 -> "November 2026"
+        12 -> "December 2026"
+        else -> "Rozpis"
+    }
+    
+    val daysInMonth = ym.lengthOfMonth()
+    
+    val sb = StringBuilder()
+    sb.append("""
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 15px; color: #333; }
+            h2 { text-align: center; color: #1e293b; margin-bottom: 5px; }
+            p { text-align: center; color: #64748b; font-size: 12px; margin-top: 0; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th, td { border: 1px solid #cbd5e1; padding: 4px 2px; text-align: center; }
+            th { background-color: #f1f5f9; color: #1e293b; font-weight: bold; }
+            .name-col { text-align: left; padding-left: 8px; font-weight: bold; min-width: 100px; background-color: #f8fafc; }
+            .weekend { background-color: #fef3c7; }
+            .holiday { color: #dc2626; font-weight: bold; }
+            .shift-cell { font-weight: bold; }
+            .shift-SR { background-color: #d1fae5; color: #065f46; }
+            .shift-PR { background-color: #d1fae5; color: #065f46; }
+            .shift-SN { background-color: #dbeafe; color: #1e40af; }
+            .shift-PN { background-color: #dbeafe; color: #1e40af; }
+            .shift-R { background-color: #d1fae5; color: #065f46; }
+            .shift-N { background-color: #dbeafe; color: #1e40af; }
+            .shift-D { background-color: #fef3c7; color: #92400e; }
+            .shift-CH { background-color: #fee2e2; color: #991b1b; }
+            .shift-KZ { background-color: #f3e8ff; color: #6b21a8; }
+            .shift-Par { background-color: #ccfbf1; color: #0f767e; }
+            .shift-P { background-color: #f1f5f9; color: #334155; }
+            .shift-V { background-color: #ead8c3; color: #5f3e1e; }
+        </style>
+        </head>
+        <body>
+        <h2>Rozpis služieb - $monthName</h2>
+        <p>Generované z aplikácie</p>
+        <table>
+        <thead>
+        <tr>
+            <th>Meno zamestnanca</th>
+            <th>Spolu</th>
+    """)
+    
+    for (d in 1..daysInMonth) {
+        sb.append("<th>${d}</th>")
+    }
+    sb.append("</tr></thead><tbody>")
+    
+    fun renderRows(employees: List<RosterEmployee>) {
+        for (emp in employees) {
+            sb.append("<tr>")
+            sb.append("<td class='name-col'>${emp.name}</td>")
+            sb.append("<td style='font-weight:bold;'>${emp.totalHours}</td>")
+            
+            for (d in 1..daysInMonth) {
+                val cell = emp.shifts[d]
+                val code = cell?.code ?: ""
+                val hours = cell?.hours ?: ""
+                
+                val date = ym.atDay(d)
+                val isWeekend = date.dayOfWeek.value in 6..7
+                
+                var cellClass = "shift-cell"
+                if (code.isNotBlank()) {
+                    cellClass += " shift-${code}"
+                } else if (isWeekend) {
+                    cellClass += " weekend"
+                }
+                
+                sb.append("<td class='${cellClass}'>")
+                if (code.isNotBlank()) {
+                    sb.append(code)
+                    if (hours.isNotBlank() && hours != "0" && hours != "0,0") {
+                        sb.append("<br/><span style='font-size:8px;font-weight:normal;'>${hours} h</span>")
+                    }
+                }
+                sb.append("</td>")
+            }
+            sb.append("</tr>")
+        }
+    }
+    
+    sb.append("<tr><td colspan='${daysInMonth + 2}' style='background-color:#e2e8f0;font-weight:bold;text-align:left;padding-left:8px;'>Služba / Denná skupina</td></tr>")
+    renderRows(RosterData.topEmployees)
+    
+    sb.append("<tr><td colspan='${daysInMonth + 2}' style='background-color:#e2e8f0;font-weight:bold;text-align:left;padding-left:8px;'>Služba / Turnusová skupina</td></tr>")
+    renderRows(RosterData.bottomEmployees)
+    
+    sb.append("</tbody></table></body></html>")
+    return sb.toString()
+}
+
+fun generateCalendarPrintHtml(context: android.content.Context, monthIndex: Int, personalShifts: List<com.example.data.ShiftDay>, isCleanerModeEnabled: Boolean): String {
+    val ym = RosterData.getYearMonthForIndex(monthIndex)
+    val monthName = when (monthIndex) {
+        0 -> "December 2025"
+        1 -> "Január 2026"
+        2 -> "Február 2026"
+        3 -> "Marec 2026"
+        4 -> "Apríl 2026"
+        5 -> "Máj 2026"
+        6 -> "Jún 2026"
+        7 -> "Júl 2026"
+        8 -> "August 2026"
+        9 -> "September 2026"
+        10 -> "Október 2026"
+        11 -> "November 2026"
+        12 -> "December 2026"
+        else -> "Kalendár"
+    }
+    
+    val firstDayOfMonth = ym.atDay(1)
+    val daysInMonth = ym.lengthOfMonth()
+    val startDayOfWeek = firstDayOfMonth.dayOfWeek.value // 1 (Mon) to 7 (Sun)
+    
+    val sb = StringBuilder()
+    sb.append("""
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #333; }
+            h2 { text-align: center; color: #1e293b; margin-bottom: 5px; }
+            p { text-align: center; color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 25px; }
+            .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+            .day-header { font-weight: bold; text-align: center; padding: 10px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+            .day-cell { border: 1px solid #cbd5e1; border-radius: 8px; min-height: 90px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+            .day-num { font-weight: bold; font-size: 14px; color: #475569; }
+            .weekend-num { color: #dc2626; }
+            .empty-cell { border: 1px dashed #e2e8f0; background-color: #fafafa; }
+            .shift-badge { margin-top: 5px; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; text-align: center; }
+            .shift-SR { background-color: #d1fae5; color: #065f46; }
+            .shift-PR { background-color: #d1fae5; color: #065f46; }
+            .shift-SN { background-color: #dbeafe; color: #1e40af; }
+            .shift-PN { background-color: #dbeafe; color: #1e40af; }
+            .shift-R { background-color: #d1fae5; color: #065f46; }
+            .shift-N { background-color: #dbeafe; color: #1e40af; }
+            .shift-D { background-color: #fef3c7; color: #92400e; }
+            .shift-CH { background-color: #fee2e2; color: #991b1b; }
+            .shift-KZ { background-color: #f3e8ff; color: #6b21a8; }
+            .shift-Par { background-color: #ccfbf1; color: #0f767e; }
+            .shift-P { background-color: #f1f5f9; color: #334155; }
+            .shift-V { background-color: #ead8c3; color: #5f3e1e; }
+            .notes { font-size: 9px; color: #64748b; margin-top: 4px; border-top: 1px solid #f1f5f9; padding-top: 3px; word-break: break-all; }
+        </style>
+        </head>
+        <body>
+        <h2>Môj kalendár smien - ${monthName}</h2>
+        <p>Osobný rozpis</p>
+        <div class="calendar-grid">
+            <div class="day-header">Pondelok</div>
+            <div class="day-header">Utorok</div>
+            <div class="day-header">Streda</div>
+            <div class="day-header">Štvrtok</div>
+            <div class="day-header">Piatok</div>
+            <div class="day-header" style="color: #dc2626;">Sobota</div>
+            <div class="day-header" style="color: #dc2626;">Nedeľa</div>
+    """)
+    
+    for (i in 1 until startDayOfWeek) {
+        sb.append("<div class='day-cell empty-cell'></div>")
+    }
+    
+    for (d in 1..daysInMonth) {
+        val date = ym.atDay(d)
+        val isWeekend = date.dayOfWeek.value in 6..7
+        val dateStr = date.toString()
+        val shift = personalShifts.find { it.date == dateStr }
+        val codeDb = shift?.shiftType ?: "NONE"
+        val code = when (codeDb) {
+            "MORNING" -> "R"
+            "MORNING_PR" -> "PR"
+            "NIGHT" -> "N"
+            "NIGHT_PN" -> "PN"
+            "VACATION" -> "D"
+            "SICK" -> "CH"
+            "KZ" -> "KZ"
+            "Par" -> "Par"
+            "MEETING" -> "P"
+            "TRAINING" -> "V"
+            else -> ""
+        }
+        val hours = shift?.shiftLength ?: 0
+        val note = if (!isCleanerModeEnabled) shift?.note else null
+        
+        sb.append("<div class='day-cell'>")
+        val numClass = if (isWeekend) "day-num weekend-num" else "day-num"
+        sb.append("<div class='${numClass}'>${d}</div>")
+        
+        if (code.isNotBlank()) {
+            sb.append("<div class='shift-badge shift-${code}'>${code}")
+            if (hours > 0) {
+                sb.append(" (${hours}h)")
+            }
+            sb.append("</div>")
+        }
+        
+        if (!note.isNullOrBlank()) {
+            sb.append("<div class='notes'>${note.take(40)}${if (note.length > 40) "..." else ""}</div>")
+        }
+        
+        sb.append("</div>")
+    }
+    
+    sb.append("</div></body></html>")
+    return sb.toString()
+}
