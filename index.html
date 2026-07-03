@@ -3290,7 +3290,8 @@ service cloud.firestore {
             const empOnlyView = document.getElementById('employee-only-modal');
             
             const isPreviousMonth = window.activeMonthIndex < getCurrentRosterMonthIndex();
-            if (window.canEdit && !isPreviousMonth) {
+            const isOwnProfile = emp && (emp.name === window.currentEmployeeName);
+            if ((window.canEdit || isOwnProfile) && !isPreviousMonth) {
                 adminElements.forEach(el => el.classList.remove('hidden'));
                 empOnlyView.classList.add('hidden');
                 
@@ -3328,18 +3329,20 @@ service cloud.firestore {
         };
 
         window.submitModalShiftChange = function() {
-            if (!window.canEdit) {
-                alert("Ako bežný zamestnanec nemáte oprávnenie na úpravu rozpisu!");
+            if (!window.selectedTargetCell) return;
+            const { group, empIdx, day } = window.selectedTargetCell;
+            const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
+            const emp = list[empIdx];
+            const isOwnProfile = emp && (emp.name === window.currentEmployeeName);
+
+            if (!window.canEdit && !isOwnProfile) {
+                alert("Ako bežný zamestnanec nemáte oprávnenie na úpravu rozpisu iných zamestnancov!");
                 return;
             }
             if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
                 alert("Zmeny v minulých mesiacoch nie sú povolené!");
                 return;
             }
-            if (!window.selectedTargetCell) return;
-
-            const { group, empIdx, day } = window.selectedTargetCell;
-            const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
             
             const rawCode = document.getElementById('modal-input-code').value.trim();
             const rawHours = document.getElementById('modal-input-hours').value.trim();
@@ -3362,6 +3365,11 @@ service cloud.firestore {
             // Keep personal calendar and statistics in sync
             window.renderMyCalendar();
             window.recalculateMyStatsAndSalary();
+
+            // Auto-save changes to Firebase Firestore to keep app synchronized
+            if (window.firebaseConnected && window.firestoreDb) {
+                window.saveRosterToFirestore();
+            }
         };
 
         function getSlovakMonthName(mIdx) {
@@ -3984,54 +3992,59 @@ service cloud.firestore {
                 const cellCode = shiftData.code || '';
                 const cellHours = shiftData.hours || '';
                 
-                let bgStyle = 'bg-[#0B1220]/60 border-gray-800 text-gray-300';
+                let customStyle = 'background-color: #151D2A; border-color: #1F2937; color: #D1D5DB;';
                 let codeColorClass = 'text-gray-400';
                 
                 if (cellCode) {
                     const trimmedCode = cellCode.trim().toUpperCase();
                     if (trimmedCode === 'D') {
-                        bgStyle = 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500';
-                        codeColorClass = 'bg-yellow-500 text-[#0B1220] px-1 py-0.5 rounded text-[10px] font-black';
+                        customStyle = 'background-color: #FFEA00; color: #000000; font-weight: bold;';
+                        codeColorClass = 'bg-black/15 text-black px-1.5 py-0.5 rounded text-[10px] font-black';
                     } else if (trimmedCode === 'CH') {
-                        bgStyle = 'bg-emerald-800/20 border-emerald-700/30 text-emerald-400';
-                        codeColorClass = 'bg-emerald-700 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                        customStyle = 'background-color: #14532D; color: #FFFFFF;';
+                        codeColorClass = 'bg-white/15 text-white px-1.5 py-0.5 rounded text-[10px] font-bold';
                     } else if (trimmedCode === 'PAR' || trimmedCode === 'OČR') {
-                        bgStyle = 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400';
-                        codeColorClass = 'bg-cyan-500 text-black px-1 py-0.5 rounded text-[10px] font-bold';
+                        customStyle = 'background-color: #06B6D4; color: #000000; font-weight: bold;';
+                        codeColorClass = 'bg-black/15 text-black px-1.5 py-0.5 rounded text-[10px] font-bold';
                     } else if (['SR', 'PR', 'R'].includes(trimmedCode)) {
-                        bgStyle = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
-                        codeColorClass = 'bg-emerald-400 text-brand-slate px-1 py-0.5 rounded text-[10px] font-black';
+                        customStyle = 'background-color: #86EFAC; color: #052E16; font-weight: bold;';
+                        codeColorClass = 'bg-black/10 text-[#052E16] px-1.5 py-0.5 rounded text-[10px] font-black';
                     } else if (['SN', 'PN', 'N'].includes(trimmedCode)) {
-                        bgStyle = 'bg-blue-500/10 border-blue-500/30 text-blue-400';
-                        codeColorClass = 'bg-blue-500 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                        customStyle = 'background-color: #3B82F6; color: #FFFFFF; font-weight: bold;';
+                        codeColorClass = 'bg-white/15 text-white px-1.5 py-0.5 rounded text-[10px] font-bold';
                     } else if (['KZ', 'KZS', 'KZV', 'KZVS'].includes(trimmedCode)) {
-                        bgStyle = 'bg-pink-500/10 border-pink-500/30 text-pink-400';
-                        codeColorClass = 'bg-pink-500 text-black px-1 py-0.5 rounded text-[10px] font-bold';
+                        customStyle = 'background-color: #D946EF; color: #000000; font-weight: bold;';
+                        codeColorClass = 'bg-black/15 text-black px-1.5 py-0.5 rounded text-[10px] font-bold';
                     } else if (trimmedCode === 'P') {
-                        bgStyle = 'bg-slate-500/10 border-slate-500/30 text-slate-300';
-                        codeColorClass = 'bg-slate-500 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                        if (window.isDailyGroupEmployee(activeEmp.name)) {
+                            customStyle = 'background-color: #86EFAC; color: #052E16; font-weight: bold;';
+                            codeColorClass = 'bg-black/10 text-[#052E16] px-1.5 py-0.5 rounded text-[10px] font-bold';
+                        } else {
+                            customStyle = 'background-color: #64748B; color: #FFFFFF;';
+                            codeColorClass = 'bg-white/15 text-white px-1.5 py-0.5 rounded text-[10px] font-bold';
+                        }
                     } else if (trimmedCode === 'V') {
-                        bgStyle = 'bg-amber-800/10 border-amber-800/30 text-amber-400';
-                        codeColorClass = 'bg-amber-800 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                        customStyle = 'background-color: #8B5A2B; color: #FFFFFF;';
+                        codeColorClass = 'bg-white/15 text-white px-1.5 py-0.5 rounded text-[10px] font-bold';
                     } else {
-                        bgStyle = 'bg-slate-700/10 border-slate-700/30 text-slate-300';
-                        codeColorClass = 'bg-slate-600 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                        customStyle = 'background-color: #475569; color: #F1F5F9;';
+                        codeColorClass = 'bg-white/15 text-white px-1.5 py-0.5 rounded text-[10px] font-bold';
                     }
                 } else if (isWeekendDay(d, window.activeMonthIndex)) {
-                    bgStyle = 'bg-brand-weekend/40 border-gray-800/60 text-gray-400';
+                    customStyle = 'background-color: #1E293B; border-color: #374151; color: #9CA3AF;';
                 }
-
+                
                 // Highlight currently selected day in calendar
                 const isSelectedDay = window.selectedCalendarDay === d;
-                const activeBorderClass = isSelectedDay ? 'ring-2 ring-brand-primary border-brand-primary' : 'border border-gray-800';
-
+                const activeBorderClass = isSelectedDay ? 'ring-2 ring-brand-primary border-brand-primary' : 'border border-gray-800/40';
+                
                 gridHtml += `
-                    <div onclick="window.selectCalendarDay(${d})" class="${bgStyle} ${activeBorderClass} rounded-2xl p-2.5 min-h-[80px] flex flex-col justify-between cursor-pointer hover:scale-105 transition-all duration-200">
+                    <div onclick="window.selectCalendarDay(${d})" style="${customStyle}" class="${activeBorderClass} rounded-2xl p-2.5 min-h-[80px] flex flex-col justify-between cursor-pointer hover:scale-105 transition-all duration-200 shadow-sm">
                         <div class="flex justify-between items-start">
                             <span class="text-xs font-bold">${d}</span>
                             ${cellCode ? `<span class="${codeColorClass}">${cellCode}</span>` : ''}
                         </div>
-                        <div class="text-[10px] font-bold tracking-tight text-right text-gray-500">
+                        <div class="text-[10px] font-extrabold tracking-tight text-right opacity-90">
                             ${cellHours ? `${cellHours} hod` : ''}
                         </div>
                     </div>
@@ -4090,7 +4103,8 @@ service cloud.firestore {
 
             const shift = emp.shifts[d] || { code: null, hours: null };
             const isPrevMonth = window.activeMonthIndex < getCurrentRosterMonthIndex();
-            const editable = window.canEdit && !isPrevMonth;
+            const isOwnProfile = emp.name === window.currentEmployeeName;
+            const editable = (window.canEdit || isOwnProfile) && !isPrevMonth;
 
             let html = '';
 
@@ -4217,6 +4231,11 @@ service cloud.firestore {
             window.renderMyCalendar();
             window.recalculateMyStatsAndSalary();
             renderRosterUI();
+
+            // Auto-save changes to Firebase Firestore to keep app synchronized
+            if (window.firebaseConnected && window.firestoreDb) {
+                window.saveRosterToFirestore();
+            }
         };
 
         window.executeCalendarCopy = function(sourceDay) {
@@ -4249,6 +4268,11 @@ service cloud.firestore {
             window.renderMyCalendar();
             window.recalculateMyStatsAndSalary();
             renderRosterUI();
+
+            // Auto-save changes to Firebase Firestore to keep app synchronized
+            if (window.firebaseConnected && window.firestoreDb) {
+                window.saveRosterToFirestore();
+            }
         };
 
         window.recalculateMyStatsAndSalary = function() {

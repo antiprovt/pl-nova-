@@ -122,8 +122,20 @@ dependencies {
   "ksp"(libs.moshi.kotlin.codegen)
 }
 
-tasks.register<Copy>("copyApkToRoot") {
-    from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
-    into(rootDir)
-    rename { "Stiahnut-APK.apk" }
+tasks.register("copyApkToRoot") {
+    notCompatibleWithConfigurationCache("Custom task references script files and properties")
+    doLast {
+        val src = File(layout.buildDirectory.get().asFile, "outputs/apk/debug/app-debug.apk")
+        val dst = File(rootDir, "Stiahnut-APK.apk")
+        if (src.exists()) {
+            src.copyTo(dst, overwrite = true)
+            println("Successfully copied debug APK to root Stiahnut-APK.apk")
+        } else {
+            println("Source APK not found: ${src.absolutePath}")
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleDebug" }.all {
+    finalizedBy("copyApkToRoot")
 }
