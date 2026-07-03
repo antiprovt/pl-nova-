@@ -986,6 +986,107 @@ service cloud.firestore {
         </div>
     </div>
 
+    <!-- Modal dialogue: Settings -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-brand-slate/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 my-8">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-brand-primary text-2xl">settings</span>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Nastavenia aplikácie</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Konfigurácia užívateľa, platu a preferencií</p>
+                    </div>
+                </div>
+                <button onclick="window.closeSettingsDialog()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
+                <!-- User Profile Section -->
+                <div class="bg-[#0B1220]/60 border border-gray-800 p-4 rounded-2xl space-y-3">
+                    <div class="text-[10px] font-bold text-brand-primary uppercase tracking-widest">👤 Profil a overenie</div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Meno používateľa</label>
+                        <input id="settings-username" type="text" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">E-mail pre zasielanie kódov</label>
+                        <input id="settings-email" type="email" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Heslo do rozpisu (predvolené: 123456)</label>
+                        <input id="settings-password" type="password" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-primary transition">
+                    </div>
+                </div>
+
+                <!-- Preferences Section -->
+                <div class="bg-[#0B1220]/60 border border-gray-800 p-4 rounded-2xl space-y-3">
+                    <div class="text-[10px] font-bold text-brand-primary uppercase tracking-widest">⚙️ Preferencie a zobrazenie</div>
+                    
+                    <!-- Shift length selection -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Predvolená dĺžka zmeny (hodiny)</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button id="settings-shift-len-12" onclick="window.setSettingsShiftLength(12)" class="px-4 py-2 text-xs font-bold rounded-xl border border-gray-700 text-gray-400 hover:text-white transition">12 Hodín (Smenár)</button>
+                            <button id="settings-shift-len-8" onclick="window.setSettingsShiftLength(8)" class="px-4 py-2 text-xs font-bold rounded-xl border border-gray-700 text-gray-400 hover:text-white transition">8 Hodín (Dennist)</button>
+                        </div>
+                    </div>
+
+                    <!-- Countdown Timer switch -->
+                    <div class="flex items-center justify-between py-1">
+                        <div>
+                            <div class="text-xs font-bold text-white">Odpočítavanie k ďalšej zmene</div>
+                            <div class="text-[10px] text-gray-400">Zobraziť časovač do začiatku najbližšej služby</div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="settings-countdown-switch" type="checkbox" class="sr-only peer" onchange="window.toggleSettingsCountdown(this.checked)">
+                            <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-primary"></div>
+                        </label>
+                    </div>
+
+                    <!-- Cleaner switch -->
+                    <div class="flex items-center justify-between py-1">
+                        <div>
+                            <div class="text-xs font-bold text-white">Režim upratovačky (Čistič)</div>
+                            <div class="text-[10px] text-gray-400">Prispôsobiť zobrazenie pre pomocný personál</div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="settings-cleaner-switch" type="checkbox" class="sr-only peer" onchange="window.toggleSettingsCleaner(this.checked)">
+                            <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-primary"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Financial Settings Accordion card inside Settings -->
+                <div class="bg-[#0B1220]/60 border border-gray-800 p-4 rounded-2xl space-y-3">
+                    <div class="text-[10px] font-bold text-brand-primary uppercase tracking-widest">💰 Mzdové sadzby</div>
+                    <p class="text-[10px] text-gray-400">Tieto hodnoty sa automaticky synchronizujú so sadzbami výplaty.</p>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Základ (Brutto €)</label>
+                            <input id="settings-salary-tariff" type="number" step="0.01" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-primary" oninput="window.syncSettingsSalary('tariff', this.value)">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Osobné ohodnotenie (€)</label>
+                            <input id="settings-salary-personal" type="number" step="0.01" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-primary" oninput="window.syncSettingsSalary('personal', this.value)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="window.closeSettingsDialog()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-400 hover:text-white font-bold py-3 rounded-xl transition">
+                    Zrušiť
+                </button>
+                <button onclick="window.submitSettingsChange()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition shadow-lg shadow-brand-primary/10">
+                    Uložiť nastavenia
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MAIN IMPLEMENTATION JAVASCRIPT: Modular Firebase SDK Loading -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -1771,6 +1872,15 @@ service cloud.firestore {
             renderRosterUI();
             updateUIControlsBasedOnRole();
 
+            // Populate Šichter view components
+            try {
+                window.renderMyCalendar();
+                window.recalculateMyStatsAndSalary();
+                window.renderMyOverview();
+            } catch (e) {
+                console.warn("Failed to populate Šichter view on login change:", e);
+            }
+
             // Setup real-time messaging listeners for the new user profile
             if (window.firebaseConnected && window.firestoreDb) {
                 try {
@@ -2211,6 +2321,13 @@ service cloud.firestore {
                     loadRosterFallback();
                 }
                 renderRosterUI();
+                try {
+                    window.renderMyCalendar();
+                    window.recalculateMyStatsAndSalary();
+                    window.renderMyOverview();
+                } catch (e) {
+                    console.warn("Failed to update Šichter view components on load:", e);
+                }
             } catch (e) {
                 console.error(e);
                 alert("Nepodarilo sa stiahnuť rozpis z Firestore: " + e.message);
@@ -3237,6 +3354,856 @@ service cloud.firestore {
                 arrow.innerText = 'expand_more';
             }
         };
+
+        // UI View switching & Navigation
+        window.switchView = function(viewName) {
+            const shichterBtn = document.getElementById('nav-btn-shichter');
+            const rozpisBtn = document.getElementById('nav-btn-rozpis');
+            const shichterView = document.getElementById('view-shichter');
+            const rozpisView = document.getElementById('view-rozpis');
+
+            if (viewName === 'shichter') {
+                if (shichterView) shichterView.classList.remove('hidden');
+                if (rozpisView) rozpisView.classList.add('hidden');
+                
+                // Style buttons
+                if (shichterBtn) {
+                    shichterBtn.className = "w-full px-4 py-3.5 rounded-2xl flex items-center gap-3.5 text-sm font-bold transition-all text-[#90CAF9] bg-[#1565C0]/20 border border-[#1565C0]/30 shadow-md";
+                }
+                if (rozpisBtn) {
+                    rozpisBtn.className = "w-full px-4 py-3.5 rounded-2xl flex items-center gap-3.5 text-sm font-bold transition-all text-gray-400 hover:text-white hover:bg-gray-800/40 border border-transparent";
+                }
+            } else if (viewName === 'rozpis') {
+                if (shichterView) shichterView.classList.add('hidden');
+                if (rozpisView) rozpisView.classList.remove('hidden');
+                
+                // Style buttons
+                if (shichterBtn) {
+                    shichterBtn.className = "w-full px-4 py-3.5 rounded-2xl flex items-center gap-3.5 text-sm font-bold transition-all text-gray-400 hover:text-white hover:bg-gray-800/40 border border-transparent";
+                }
+                if (rozpisBtn) {
+                    rozpisBtn.className = "w-full px-4 py-3.5 rounded-2xl flex items-center gap-3.5 text-sm font-bold transition-all text-[#90CAF9] bg-[#1565C0]/20 border border-[#1565C0]/30 shadow-md";
+                }
+            }
+            window.toggleSidebar(false);
+        };
+
+        window.switchSubTab = function(subTabName) {
+            const tabCalendar = document.getElementById('subtab-calendar');
+            const tabStats = document.getElementById('subtab-stats');
+            const tabOverview = document.getElementById('subtab-overview');
+
+            const btnCalendar = document.getElementById('subtab-btn-calendar');
+            const btnStats = document.getElementById('subtab-btn-stats');
+            const btnOverview = document.getElementById('subtab-btn-overview');
+
+            // Hide all subtabs
+            if (tabCalendar) tabCalendar.classList.add('hidden');
+            if (tabStats) tabStats.classList.add('hidden');
+            if (tabOverview) tabOverview.classList.add('hidden');
+
+            // Reset all buttons style to inactive
+            const inactiveClass = "px-5 py-3 font-bold text-xs rounded-t-2xl flex items-center gap-2 border-b-2 border-transparent text-gray-400 hover:text-white transition";
+            const activeClass = "px-5 py-3 font-extrabold text-xs rounded-t-2xl flex items-center gap-2 border-b-2 border-[#90CAF9] text-[#90CAF9] bg-[#151D2A]/60 transition";
+
+            if (btnCalendar) btnCalendar.className = inactiveClass;
+            if (btnStats) btnStats.className = inactiveClass;
+            if (btnOverview) btnOverview.className = inactiveClass;
+
+            // Show selected tab & set active styling
+            if (subTabName === 'calendar') {
+                if (tabCalendar) tabCalendar.classList.remove('hidden');
+                if (btnCalendar) btnCalendar.className = activeClass;
+                window.renderMyCalendar();
+            } else if (subTabName === 'stats') {
+                if (tabStats) tabStats.classList.remove('hidden');
+                if (btnStats) btnStats.className = activeClass;
+                window.recalculateMyStatsAndSalary();
+            } else if (subTabName === 'overview') {
+                if (tabOverview) tabOverview.classList.remove('hidden');
+                if (btnOverview) btnOverview.className = activeClass;
+                window.renderMyOverview();
+            }
+        };
+
+        window.toggleSidebar = function(show) {
+            const drawer = document.getElementById('sidebar-drawer');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (!drawer) return;
+            if (show) {
+                drawer.classList.remove('-translate-x-full');
+                drawer.classList.add('translate-x-0');
+                if (overlay) overlay.classList.remove('hidden');
+            } else {
+                drawer.classList.add('-translate-x-full');
+                drawer.classList.remove('translate-x-0');
+                if (overlay) overlay.classList.add('hidden');
+            }
+        };
+
+        window.syncRosterMonth = function(monthVal) {
+            const valNum = parseInt(monthVal, 10);
+            window.activeMonthIndex = valNum;
+            
+            // Sync main month selector
+            const mainSel = document.getElementById('month-selector');
+            if (mainSel) mainSel.value = monthVal;
+
+            // Sync other month selector in sidebar/calendar
+            const subSel = document.getElementById('subtab-month-selector');
+            if (subSel) subSel.value = monthVal;
+
+            // Load roster from database/fallbacks
+            window.loadRosterFromFirestore();
+        };
+
+        window.onPreviewProfileChanged = function() {
+            const sel = document.getElementById('preview-profile-selector');
+            if (!sel) return;
+            window.currentEmployeeName = sel.value;
+            // Re-render
+            window.renderMyCalendar();
+            window.recalculateMyStatsAndSalary();
+            window.renderMyOverview();
+        };
+
+        window.toggleSalaryDetails = function() {
+            const panel = document.getElementById('salary-details-expanded-panel');
+            const btnText = document.getElementById('salary-details-btn-text');
+            if (!panel) return;
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                if (btnText) btnText.innerText = "Skryť položky";
+            } else {
+                panel.classList.add('hidden');
+                if (btnText) btnText.innerText = "Rozbaliť položky";
+            }
+        };
+
+        window.updateSalaryConfig = function(key, val) {
+            localStorage.setItem('salary_cfg_' + key, val);
+            // Sync settings inputs as well
+            if (key === 'tariffSalary') {
+                const sTar = document.getElementById('settings-salary-tariff');
+                if (sTar) sTar.value = val;
+            } else if (key === 'personalAllowance') {
+                const sPer = document.getElementById('settings-salary-personal');
+                if (sPer) sPer.value = val;
+            }
+            window.recalculateMyStatsAndSalary();
+        };
+
+        window.syncSettingsSalary = function(type, val) {
+            if (type === 'tariff') {
+                const input = document.getElementById('salary-input-tariff');
+                if (input) {
+                    input.value = val;
+                    window.updateSalaryConfig('tariffSalary', val);
+                }
+            } else if (type === 'personal') {
+                const input = document.getElementById('salary-input-personal');
+                if (input) {
+                    input.value = val;
+                    window.updateSalaryConfig('personalAllowance', val);
+                }
+            }
+        };
+
+        window.openSettingsDialog = function() {
+            const modal = document.getElementById('settings-modal');
+            if (!modal) return;
+            
+            // Populate fields
+            document.getElementById('settings-username').value = localStorage.getItem('logged_in_user_name') || window.currentEmployeeName || '';
+            document.getElementById('settings-email').value = localStorage.getItem('user_email') || '';
+            document.getElementById('settings-password').value = localStorage.getItem('roster_login_password') || '123456';
+            
+            // Load shift length
+            const shiftLen = parseInt(localStorage.getItem('default_shift_length') || '12', 10);
+            window.setSettingsShiftLength(shiftLen);
+
+            // Load countdown switch
+            document.getElementById('settings-countdown-switch').checked = localStorage.getItem('countdown_enabled') === 'true';
+
+            // Load cleaner switch
+            document.getElementById('settings-cleaner-switch').checked = localStorage.getItem('cleaner_enabled') === 'true';
+
+            // Populate salary
+            document.getElementById('settings-salary-tariff').value = document.getElementById('salary-input-tariff').value;
+            document.getElementById('settings-salary-personal').value = document.getElementById('salary-input-personal').value;
+
+            modal.classList.remove('hidden');
+        };
+
+        window.closeSettingsDialog = function() {
+            const modal = document.getElementById('settings-modal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.setSettingsShiftLength = function(len) {
+            localStorage.setItem('default_shift_length', len.toString());
+            const btn12 = document.getElementById('settings-shift-len-12');
+            const btn8 = document.getElementById('settings-shift-len-8');
+            if (len === 12) {
+                if (btn12) btn12.className = "px-4 py-2 text-xs font-bold rounded-xl border border-brand-primary text-brand-primary bg-brand-primary/10 transition";
+                if (btn8) btn8.className = "px-4 py-2 text-xs font-bold rounded-xl border border-gray-700 text-gray-400 hover:text-white transition";
+            } else {
+                if (btn12) btn12.className = "px-4 py-2 text-xs font-bold rounded-xl border border-gray-700 text-gray-400 hover:text-white transition";
+                if (btn8) btn8.className = "px-4 py-2 text-xs font-bold rounded-xl border border-brand-primary text-brand-primary bg-brand-primary/10 transition";
+            }
+        };
+
+        window.toggleSettingsCountdown = function(checked) {
+            localStorage.setItem('countdown_enabled', checked ? 'true' : 'false');
+        };
+
+        window.toggleSettingsCleaner = function(checked) {
+            localStorage.setItem('cleaner_enabled', checked ? 'true' : 'false');
+        };
+
+        window.submitSettingsChange = function() {
+            const uName = document.getElementById('settings-username').value.trim();
+            const email = document.getElementById('settings-email').value.trim();
+            const pass = document.getElementById('settings-password').value.trim();
+
+            if (uName) {
+                localStorage.setItem('logged_in_user_name', uName);
+                window.currentEmployeeName = uName;
+            }
+            if (email) {
+                localStorage.setItem('user_email', email);
+            }
+            if (pass) {
+                localStorage.setItem('roster_login_password', pass);
+            }
+
+            alert("Nastavenia boli úspešne uložené!");
+            window.closeSettingsDialog();
+            window.onLoginStateChanged();
+        };
+
+        function isSlovakHolidayJS(day, mIdx) {
+            if (mIdx === 0) return (day === 24 || day === 25 || day === 26); // Dec 2025
+            if (mIdx === 1) return (day === 1 || day === 6); // Jan 2026
+            if (mIdx === 5) return (day === 1 || day === 8); // May 2026
+            if (mIdx === 7) return (day === 5); // Jul 2026
+            if (mIdx === 8) return (day === 29); // Aug 2026
+            if (mIdx === 9) return (day === 1 || day === 15); // Sep 2026
+            if (mIdx === 11) return (day === 1 || day === 17); // Nov 2026
+            if (mIdx === 12) return (day === 24 || day === 25 || day === 26); // Dec 2026
+            return false;
+        }
+
+        window.renderMyCalendar = function() {
+            const grid = document.getElementById('my-calendar-grid');
+            if (!grid) return;
+
+            // Identify active previewed employee name
+            const role = window.currentUserRole;
+            let empName = window.currentEmployeeName;
+
+            // For admin or authorized people, we can choose who to preview
+            const previewSelector = document.getElementById('preview-profile-selector');
+            const previewContainer = document.getElementById('profile-preview-container');
+
+            if (role === 'admin' || role === 'poverena') {
+                if (previewContainer) previewContainer.classList.remove('hidden');
+                
+                // Populate selector if empty
+                if (previewSelector && previewSelector.children.length === 0) {
+                    const topNames = (window.activeRoster?.topEmployees || []).map(e => e.name);
+                    const bottomNames = (window.activeRoster?.bottomEmployees || []).map(e => e.name);
+                    const allNames = [...topNames, ...bottomNames];
+                    let options = '';
+                    allNames.forEach(n => {
+                        options += `<option value="${n}" ${n === empName ? 'selected' : ''}>${n}</option>`;
+                    });
+                    previewSelector.innerHTML = options;
+                }
+                if (previewSelector && previewSelector.value) {
+                    empName = previewSelector.value;
+                }
+            } else {
+                if (previewContainer) previewContainer.classList.add('hidden');
+            }
+
+            // Find employee
+            const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
+            const activeEmp = employees.find(e => e.name === empName) || employees[0];
+
+            if (!activeEmp) {
+                grid.innerHTML = '<div class="col-span-7 text-center text-xs text-gray-500 py-8">Žiadni zamestnanci v rozpise</div>';
+                return;
+            }
+
+            // Sync employee selection
+            if (previewSelector && activeEmp) {
+                previewSelector.value = activeEmp.name;
+            }
+
+            const targetLen = getLengthOfMonth(window.activeMonthIndex);
+            
+            // First day of week
+            const firstDayIdx = window.getFirstDayOfWeekIndex(window.activeMonthIndex);
+            
+            let gridHtml = '';
+            
+            // Render placeholders for preceding days
+            for (let i = 0; i < firstDayIdx; i++) {
+                gridHtml += `<div class="bg-[#151D2A]/20 rounded-xl min-h-[70px] border border-transparent"></div>`;
+            }
+
+            // Render days
+            for (let d = 1; d <= targetLen; d++) {
+                const shiftData = activeEmp.shifts[d] || { code: null, hours: null };
+                const cellCode = shiftData.code || '';
+                const cellHours = shiftData.hours || '';
+                
+                let bgStyle = 'bg-[#0B1220]/60 border-gray-800 text-gray-300';
+                let codeColorClass = 'text-gray-400';
+                
+                if (cellCode) {
+                    const trimmedCode = cellCode.trim().toUpperCase();
+                    if (trimmedCode === 'D') {
+                        bgStyle = 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500';
+                        codeColorClass = 'bg-yellow-500 text-[#0B1220] px-1 py-0.5 rounded text-[10px] font-black';
+                    } else if (trimmedCode === 'CH') {
+                        bgStyle = 'bg-emerald-800/20 border-emerald-700/30 text-emerald-400';
+                        codeColorClass = 'bg-emerald-700 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                    } else if (trimmedCode === 'PAR' || trimmedCode === 'OČR') {
+                        bgStyle = 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400';
+                        codeColorClass = 'bg-cyan-500 text-black px-1 py-0.5 rounded text-[10px] font-bold';
+                    } else if (['SR', 'PR', 'R'].includes(trimmedCode)) {
+                        bgStyle = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+                        codeColorClass = 'bg-emerald-400 text-brand-slate px-1 py-0.5 rounded text-[10px] font-black';
+                    } else if (['SN', 'PN', 'N'].includes(trimmedCode)) {
+                        bgStyle = 'bg-blue-500/10 border-blue-500/30 text-blue-400';
+                        codeColorClass = 'bg-blue-500 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                    } else if (['KZ', 'KZS', 'KZV', 'KZVS'].includes(trimmedCode)) {
+                        bgStyle = 'bg-pink-500/10 border-pink-500/30 text-pink-400';
+                        codeColorClass = 'bg-pink-500 text-black px-1 py-0.5 rounded text-[10px] font-bold';
+                    } else if (trimmedCode === 'P') {
+                        bgStyle = 'bg-slate-500/10 border-slate-500/30 text-slate-300';
+                        codeColorClass = 'bg-slate-500 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                    } else if (trimmedCode === 'V') {
+                        bgStyle = 'bg-amber-800/10 border-amber-800/30 text-amber-400';
+                        codeColorClass = 'bg-amber-800 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                    } else {
+                        bgStyle = 'bg-slate-700/10 border-slate-700/30 text-slate-300';
+                        codeColorClass = 'bg-slate-600 text-white px-1 py-0.5 rounded text-[10px] font-bold';
+                    }
+                } else if (isWeekendDay(d, window.activeMonthIndex)) {
+                    bgStyle = 'bg-brand-weekend/40 border-gray-800/60 text-gray-400';
+                }
+
+                // Highlight currently selected day in calendar
+                const isSelectedDay = window.selectedCalendarDay === d;
+                const activeBorderClass = isSelectedDay ? 'ring-2 ring-brand-primary border-brand-primary' : 'border border-gray-800';
+
+                gridHtml += `
+                    <div onclick="window.selectCalendarDay(${d})" class="${bgStyle} ${activeBorderClass} rounded-2xl p-2.5 min-h-[80px] flex flex-col justify-between cursor-pointer hover:scale-105 transition-all duration-200">
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold">${d}</span>
+                            ${cellCode ? `<span class="${codeColorClass}">${cellCode}</span>` : ''}
+                        </div>
+                        <div class="text-[10px] font-bold tracking-tight text-right text-gray-500">
+                            ${cellHours ? `${cellHours} hod` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = gridHtml;
+
+            // Trigger details update for currently selected day (or day 1 if none)
+            if (!window.selectedCalendarDay || window.selectedCalendarDay > targetLen) {
+                window.selectedCalendarDay = 1;
+            }
+            window.updateCalendarDayDetails(activeEmp, window.selectedCalendarDay);
+        };
+
+        window.getFirstDayOfWeekIndex = function(mIdx) {
+            const year = mIdx === 0 ? 2025 : 2026;
+            const month = mIdx === 0 ? 11 : mIdx - 1;
+            const d = new Date(year, month, 1);
+            const day = d.getDay(); // 0 is Sunday
+            return day === 0 ? 6 : day - 1; // Mon=0 ... Sun=6
+        };
+
+        window.selectCalendarDay = function(d) {
+            window.selectedCalendarDay = d;
+            
+            // Re-render grid to update active highlights
+            const previewSelector = document.getElementById('preview-profile-selector');
+            const empName = previewSelector ? previewSelector.value : window.currentEmployeeName;
+            
+            const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
+            const activeEmp = employees.find(e => e.name === empName) || employees[0];
+            
+            if (activeEmp) {
+                window.updateCalendarDayDetails(activeEmp, d);
+                // Re-render only to update ring highlights
+                window.renderMyCalendar();
+            }
+        };
+
+        window.updateCalendarDayDetails = function(emp, d) {
+            const editorContainer = document.getElementById('my-day-details-editor');
+            if (!editorContainer) return;
+
+            const shift = emp.shifts[d] || { code: null, hours: null };
+            const isPrevMonth = window.activeMonthIndex < getCurrentRosterMonthIndex();
+            const editable = window.canEdit && !isPrevMonth;
+
+            let html = '';
+
+            // Header banner
+            const slovakMonthName = getSlovakMonthName(window.activeMonthIndex);
+            const yearLabel = window.activeMonthIndex === 0 ? "2025" : "2026";
+            
+            html += `
+                <div class="flex items-center gap-3 bg-[#0B1220]/60 p-4 rounded-2xl border border-gray-800">
+                    <div class="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center font-black text-lg">
+                        ${d}
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-extrabold text-white uppercase tracking-wider">Detail Služby</h4>
+                        <p class="text-[10px] text-gray-400 font-medium">${d}. ${slovakMonthName} ${yearLabel}</p>
+                    </div>
+                </div>
+            `;
+
+            // Display current assignment card
+            const desc = window.getShiftDesc(shift.code, window.isDailyGroupEmployee(emp.name));
+            html += `
+                <div class="bg-brand-navy p-4 rounded-2xl border border-gray-800 space-y-2">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Aktuálne Zaradenie</div>
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full ${shift.code ? 'bg-brand-primary animate-pulse' : 'bg-gray-700'}"></span>
+                        <span class="text-sm font-bold text-white">${shift.code || "Voľný deň / Nezaradené"}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed font-medium">${desc}</p>
+                    ${shift.hours ? `<div class="text-[11px] font-bold text-brand-accent">Odpracované hodiny: ${shift.hours} hod</div>` : ''}
+                </div>
+            `;
+
+            // If user has admin rights, render inputs
+            if (editable) {
+                html += `
+                    <div class="bg-[#0B1220]/60 p-4 rounded-2xl border border-gray-800 space-y-3.5">
+                        <div class="text-[10px] font-bold text-brand-primary uppercase tracking-widest">Rýchle predvoľby (Admin)</div>
+                        <div class="grid grid-cols-4 gap-1.5 text-[10px] font-black">
+                            <button onclick="window.setCalendarPreset('SR', '11,5')" class="py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition">SR</button>
+                            <button onclick="window.setCalendarPreset('SN', '11,5')" class="py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition">SN</button>
+                            <button onclick="window.setCalendarPreset('R', '7,5')" class="py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition">R</button>
+                            <button onclick="window.setCalendarPreset('N', '11,5')" class="py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition">N</button>
+                            <button onclick="window.setCalendarPreset('PR', '11,5')" class="py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition">PR</button>
+                            <button onclick="window.setCalendarPreset('PN', '11,5')" class="py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition">PN</button>
+                            <button onclick="window.setCalendarPreset('P', '7,5')" class="py-2 rounded-lg bg-slate-500/10 text-slate-400 border border-slate-500/20 hover:bg-slate-500/20 transition">P</button>
+                            <button onclick="window.setCalendarPreset('D', '11,5')" class="py-2 rounded-lg bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 hover:bg-yellow-500/20 transition">D</button>
+                            <button onclick="window.setCalendarPreset('CH', '11,5')" class="py-2 rounded-lg bg-emerald-800/10 text-emerald-400 border border-emerald-800/20 hover:bg-[#14532d]/40 transition">CH</button>
+                            <button onclick="window.setCalendarPreset('PAR', '11,5')" class="py-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition">PAR</button>
+                            <button onclick="window.setCalendarPreset('KZ', '11,5')" class="py-2 rounded-lg bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20 transition">KZ</button>
+                            <button onclick="window.setCalendarPreset(null, null)" class="py-2 rounded-lg bg-brand-slate text-gray-400 border border-gray-700 hover:text-white transition">VOĽNO</button>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kód služby</label>
+                                <input id="calendar-edit-code" type="text" value="${shift.code || ''}" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-primary uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Odprac. hodiny</label>
+                                <input id="calendar-edit-hours" type="text" value="${shift.hours || ''}" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-primary">
+                            </div>
+                        </div>
+
+                        <!-- Copy/Move shift targets within calendar -->
+                        <div class="pt-2 border-t border-gray-800 flex gap-2">
+                            <select id="calendar-move-target" class="flex-1 bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-[11px] text-white focus:outline-none focus:border-brand-primary">
+                                ${Array.from({length: targetLen}, (_, i) => i + 1).map(day => `<option value="${day}" ${day === d ? 'disabled' : ''}>Kopírovať na ${day}. deň</option>`).join('')}
+                            </select>
+                            <button onclick="window.executeCalendarCopy(${d})" class="bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/20 font-bold px-3 py-2 rounded-xl text-xs transition">
+                                <span class="material-symbols-outlined text-sm font-bold">content_copy</span>
+                            </button>
+                        </div>
+
+                        <button onclick="window.submitCalendarShiftChange(${d})" class="w-full bg-brand-primary hover:bg-brand-secondary text-brand-slate font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-brand-primary/10">
+                            <span class="material-symbols-outlined text-base">save</span>
+                            Uložiť zmenu dňa
+                        </button>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="bg-[#0B1220]/40 p-4 rounded-xl border border-gray-800 text-center text-[10px] text-gray-500 font-bold">
+                        Len administrátor alebo poverená osoba s oprávnením môže meniť rozpis služieb.
+                    </div>
+                `;
+            }
+
+            editorContainer.innerHTML = html;
+        };
+
+        window.setCalendarPreset = function(code, hours) {
+            const codeInput = document.getElementById('calendar-edit-code');
+            const hoursInput = document.getElementById('calendar-edit-hours');
+            if (codeInput) codeInput.value = code || '';
+            if (hoursInput) hoursInput.value = hours || '';
+        };
+
+        window.submitCalendarShiftChange = function(d) {
+            const previewSelector = document.getElementById('preview-profile-selector');
+            const empName = previewSelector ? previewSelector.value : window.currentEmployeeName;
+            
+            const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
+            const activeEmp = employees.find(e => e.name === empName);
+            
+            if (!activeEmp) return;
+
+            const codeInput = document.getElementById('calendar-edit-code');
+            const hoursInput = document.getElementById('calendar-edit-hours');
+            
+            const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
+            const hours = hoursInput ? hoursInput.value.trim() : '';
+
+            activeEmp.shifts[d] = {
+                day: d,
+                code: code ? code : null,
+                hours: hours ? hours.replace('.', ',') : null
+            };
+
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+
+            // Re-render
+            window.renderMyCalendar();
+            window.recalculateMyStatsAndSalary();
+            renderRosterUI();
+        };
+
+        window.executeCalendarCopy = function(sourceDay) {
+            const previewSelector = document.getElementById('preview-profile-selector');
+            const empName = previewSelector ? previewSelector.value : window.currentEmployeeName;
+            
+            const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
+            const activeEmp = employees.find(e => e.name === empName);
+            if (!activeEmp) return;
+
+            const targetDay = parseInt(document.getElementById('calendar-move-target').value, 10);
+            if (!targetDay || targetDay === sourceDay) return;
+
+            const sourceCell = activeEmp.shifts[sourceDay] || { code: null, hours: null };
+            if (!sourceCell.code) {
+                alert("Zdrojový deň nemá službu na kopírovanie!");
+                return;
+            }
+
+            activeEmp.shifts[targetDay] = {
+                day: targetDay,
+                code: sourceCell.code,
+                hours: sourceCell.hours
+            };
+
+            window.hasUnsavedChanges = true;
+            window.updatePublishUI();
+
+            alert(`Služba skopírovaná z ${sourceDay}. dňa na ${targetDay}. deň.`);
+            window.renderMyCalendar();
+            window.recalculateMyStatsAndSalary();
+            renderRosterUI();
+        };
+
+        window.recalculateMyStatsAndSalary = function() {
+            // Identify active previewed employee
+            const role = window.currentUserRole;
+            let empName = window.currentEmployeeName;
+
+            const previewSelector = document.getElementById('preview-profile-selector');
+            if ((role === 'admin' || role === 'poverena') && previewSelector && previewSelector.value) {
+                empName = previewSelector.value;
+            }
+
+            const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
+            const emp = employees.find(e => e.name === empName) || employees[0];
+            if (!emp) return;
+
+            // Gather configurations
+            const tariffSalary = parseFloat(document.getElementById('salary-input-tariff').value) || 936.50;
+            const personalAllowance = parseFloat(document.getElementById('salary-input-personal').value) || 380.00;
+            const shiftAllowance = parseFloat(document.getElementById('salary-input-other').value) || 40.00;
+            const mealRate = parseFloat(document.getElementById('salary-input-meal-rate').value) || 4.34;
+            const defaultShiftLength = parseInt(localStorage.getItem('default_shift_length') || '12', 10);
+
+            const basicHourlyRate = tariffSalary / 177.0;
+
+            let morningCount = 0;
+            let nightCount = 0;
+            let vacationCount = 0;
+            let sickCount = 0;
+
+            let totalWorkedHours = 0.0;
+            let nightHoursSum = 0.0;
+            let saturdayHoursSum = 0.0;
+            let sundayHoursSum = 0.0;
+            let holidayHoursSum = 0.0;
+            let overtimeHoursSum = 0.0;
+
+            let computedBasicWage = 0.0;
+            let computedOvertimeSurcharge = 0.0;
+            let computedNightSurcharge = 0.0;
+            let computedSaturdaySurcharge = 0.0;
+            let computedSundaySurcharge = 0.0;
+            let computedHolidaySurcharge = 0.0;
+
+            const targetLen = getLengthOfMonth(window.activeMonthIndex);
+            const year = window.activeMonthIndex === 0 ? 2025 : 2026;
+            const month = window.activeMonthIndex === 0 ? 11 : window.activeMonthIndex - 1;
+
+            for (let d = 1; d <= targetLen; d++) {
+                const cell = emp.shifts[d];
+                if (!cell || !cell.code) continue;
+
+                const code = cell.code.trim().toUpperCase();
+                const cellHrs = parseFloat(String(cell.hours || '0').replace(',', '.')) || 0.0;
+
+                // Day of week check
+                const dDate = new Date(year, month, d);
+                const dayOfWeek = dDate.getDay(); // 0 is Sunday, 6 is Saturday
+                const isSat = (dayOfWeek === 6);
+                const isSun = (dayOfWeek === 0);
+                const isHol = isSlovakHolidayJS(d, window.activeMonthIndex);
+
+                if (['SR', 'PR', 'R', 'P', 'KZ', 'KZS', 'KZV', 'KZVS'].includes(code)) {
+                    morningCount++;
+                    totalWorkedHours += cellHrs;
+                    computedBasicWage += cellHrs * basicHourlyRate;
+
+                    if (isSat) {
+                        saturdayHoursSum += cellHrs;
+                        computedSaturdaySurcharge += cellHrs * basicHourlyRate * 0.30;
+                    }
+                    if (isSun) {
+                        sundayHoursSum += cellHrs;
+                        computedSundaySurcharge += cellHrs * basicHourlyRate * 1.00;
+                    }
+                    if (isHol) {
+                        holidayHoursSum += cellHrs;
+                        computedHolidaySurcharge += cellHrs * basicHourlyRate * 1.00;
+                    }
+                } else if (['SN', 'PN', 'N'].includes(code)) {
+                    nightCount++;
+                    totalWorkedHours += cellHrs;
+                    computedBasicWage += cellHrs * basicHourlyRate;
+
+                    // Night premium applies to all night hours
+                    nightHoursSum += cellHrs;
+                    computedNightSurcharge += cellHrs * basicHourlyRate * 0.25;
+
+                    // Saturday / Sunday / Holiday split for night shifts (5.0 today, rest tomorrow)
+                    let hoursToday = 5.0;
+                    let hoursTomorrow = Math.max(0, cellHrs - 5.0);
+
+                    if (isSat) saturdayHoursSum += hoursToday;
+                    if (isSun) sundayHoursSum += hoursToday;
+                    if (isHol) holidayHoursSum += hoursToday;
+
+                    const tomorrowDate = new Date(year, month, d + 1);
+                    const isTomSat = (tomorrowDate.getDay() === 6);
+                    const isTomSun = (tomorrowDate.getDay() === 0);
+                    const isTomHol = isSlovakHolidayJS(d + 1, window.activeMonthIndex);
+
+                    if (isTomSat) saturdayHoursSum += hoursTomorrow;
+                    if (isTomSun) sundayHoursSum += hoursTomorrow;
+                    if (isTomHol) holidayHoursSum += hoursTomorrow;
+                } else if (code === 'D') {
+                    vacationCount++;
+                } else if (['CH', 'PN', 'OČR', 'PAR'].includes(code)) {
+                    sickCount++;
+                }
+            }
+
+            // Calculate absences pay
+            const dailyPnBasis = 8 * basicHourlyRate;
+            let computedPnPay = 0.0;
+            for (let i = 1; i <= sickCount; i++) {
+                computedPnPay += (i <= 3) ? (dailyPnBasis * 0.25) : (dailyPnBasis * 0.55);
+            }
+
+            let computedVacationPay = 0.0;
+            for (let i = 1; i <= vacationCount; i++) {
+                computedVacationPay += (i <= 3) ? (dailyPnBasis * 0.25) : (dailyPnBasis * 0.55);
+            }
+
+            // Fund of hours
+            const fundOfHours = getFundOfHoursJS(window.activeMonthIndex, defaultShiftLength);
+            const workedRatio = fundOfHours > 0.0 ? (totalWorkedHours / fundOfHours) : 0.0;
+            
+            const personalAllowanceBase = personalAllowance > 0 ? personalAllowance : 380.00;
+            const personalAllowanceVal = workedRatio * personalAllowanceBase;
+
+            const shiftAllowanceVal = shiftAllowance;
+            const workedShiftsForMeal = morningCount + nightCount;
+            const computedMealAllowance = workedShiftsForMeal * mealRate;
+
+            // Total Gross Wage Estimate
+            const totalWageEstimate = computedBasicWage + computedOvertimeSurcharge + computedNightSurcharge + computedSaturdaySurcharge + computedSundaySurcharge + computedHolidaySurcharge + computedPnPay + computedVacationPay + personalAllowanceVal + shiftAllowanceVal + computedMealAllowance;
+
+            // Taxes/Insurance
+            const deductibleGross = Math.max(0.0, totalWageEstimate - computedPnPay - computedMealAllowance - shiftAllowanceVal);
+            const healthInsurance = deductibleGross * 0.04;
+            const socialInsurance = deductibleGross * 0.094;
+            const totalInsurance = healthInsurance + socialInsurance;
+
+            const taxBase = Math.max(0.0, deductibleGross - totalInsurance);
+            const nczd = 492.20;
+            const taxableAmount = Math.max(0.0, taxBase - nczd);
+            const taxLimit = 3961.50;
+            const tax = taxableAmount > taxLimit ? (taxLimit * 0.19 + (taxableAmount - taxLimit) * 0.25) : (taxableAmount * 0.19);
+
+            const netWageEstimate = totalWageEstimate - totalInsurance - tax;
+
+            // Update DOM Statistics
+            const elTotalHrs = document.getElementById('stats-total-hours');
+            if (elTotalHrs) elTotalHrs.innerText = totalWorkedHours.toFixed(1).replace('.', ',') + " hod";
+            
+            const elOvtLabel = document.getElementById('stats-total-overtime-label');
+            if (elOvtLabel) elOvtLabel.innerText = "0,0 hod"; // default
+
+            const elMorn = document.getElementById('stats-count-morning');
+            if (elMorn) elMorn.innerText = morningCount + "x";
+
+            const elNight = document.getElementById('stats-count-night');
+            if (elNight) elNight.innerText = nightCount + "x";
+
+            const elAbs = document.getElementById('stats-count-absences');
+            if (elAbs) elAbs.innerText = (vacationCount + sickCount) + " dní";
+
+            // Update DOM Salary Estimate values
+            const elBrutto = document.getElementById('salary-brutto');
+            if (elBrutto) elBrutto.innerText = formatSlovakEuro(totalWageEstimate);
+
+            const elNetto = document.getElementById('salary-netto');
+            if (elNetto) elNetto.innerText = formatSlovakEuro(netWageEstimate);
+
+            // Detail breakdown fields
+            const updateVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = formatSlovakEuro(val);
+            };
+
+            updateVal('item-base-wage', computedBasicWage);
+            updateVal('item-personal-allowance', personalAllowanceVal);
+            updateVal('item-premium-night', computedNightSurcharge);
+            updateVal('item-premium-saturday', computedSaturdaySurcharge);
+            updateVal('item-premium-sunday', computedSundaySurcharge);
+            updateVal('item-premium-holiday', computedHolidaySurcharge);
+            updateVal('item-premium-overtime', computedOvertimeSurcharge);
+            updateVal('item-premium-other', shiftAllowanceVal);
+            
+            const elMeal = document.getElementById('item-meal-contribution');
+            if (elMeal) elMeal.innerText = formatSlovakEuro(computedMealAllowance);
+
+            updateVal('item-absences-pay', computedPnPay + computedVacationPay);
+
+            // Deductions
+            const updateDeduct = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = "- " + formatSlovakEuro(val);
+            };
+
+            updateDeduct('item-insurance-health', healthInsurance);
+            updateDeduct('item-insurance-social', socialInsurance);
+            updateDeduct('item-insurance-total', totalInsurance);
+
+            const elNczd = document.getElementById('item-tax-free-nczd');
+            if (elNczd) elNczd.innerText = formatSlovakEuro(nczd);
+
+            const elTaxBase = document.getElementById('item-tax-base');
+            if (elTaxBase) elTaxBase.innerText = formatSlovakEuro(taxBase);
+
+            const elTax = document.getElementById('item-tax-final');
+            if (elTax) elTax.innerText = "- " + formatSlovakEuro(tax);
+        };
+
+        window.renderMyOverview = function() {
+            const container = document.getElementById('my-overview-list-container');
+            if (!container) return;
+
+            const role = window.currentUserRole;
+            let empName = window.currentEmployeeName;
+
+            const previewSelector = document.getElementById('preview-profile-selector');
+            if ((role === 'admin' || role === 'poverena') && previewSelector && previewSelector.value) {
+                empName = previewSelector.value;
+            }
+
+            const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
+            const emp = employees.find(e => e.name === empName) || employees[0];
+            if (!emp) {
+                container.innerHTML = '<p class="text-xs text-gray-500 italic">Žiadne informácie</p>';
+                return;
+            }
+
+            const targetLen = getLengthOfMonth(window.activeMonthIndex);
+            const slovakMonthName = getSlovakMonthName(window.activeMonthIndex);
+            const yearLabel = window.activeMonthIndex === 0 ? "2025" : "2026";
+
+            let html = '';
+            for (let d = 1; d <= targetLen; d++) {
+                const cell = emp.shifts[d] || { code: null, hours: null };
+                if (!cell.code) continue;
+
+                const dayOfWeekName = getDayOfWeekName(d, window.activeMonthIndex);
+                const desc = window.getShiftDesc(cell.code, window.isDailyGroupEmployee(emp.name));
+
+                html += `
+                    <div class="bg-brand-navy/60 border border-gray-800 p-3.5 rounded-2xl flex items-center justify-between hover:border-gray-700 transition">
+                        <div>
+                            <div class="text-xs font-bold text-white">${d}. ${slovakMonthName} ${yearLabel} (${dayOfWeekName})</div>
+                            <div class="text-[11px] text-gray-400 mt-0.5 font-medium">${desc}</div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-black text-brand-primary tracking-tight">${cell.code}</span>
+                            <div class="text-[9px] text-gray-500 mt-0.5">${cell.hours ? `${cell.hours} hod` : ''}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (!html) {
+                html = `<p class="text-xs text-gray-500 italic text-center py-6">V tomto mesiaci nemáte zadefinované žiadne služby.</p>`;
+            }
+
+            container.innerHTML = html;
+        };
+
+        function getFundOfHoursJS(mIdx, defaultShiftLength) {
+            if (mIdx === 0) { // Dec 2025
+                return defaultShiftLength === 12 ? 172.5 : 161.0;
+            }
+            if (mIdx === 1) { // Jan 2026
+                return defaultShiftLength === 12 ? 180.0 : 168.0;
+            }
+            let wkDays = 0;
+            const numDays = getLengthOfMonth(mIdx);
+            for (let day = 1; day <= numDays; day++) {
+                const year = 2026;
+                const month = mIdx - 1;
+                const d = new Date(year, month, day);
+                const dayOfWeek = d.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isHol = isSlovakHolidayJS(day, mIdx);
+                if (!isWeekend && !isHol) {
+                    wkDays++;
+                }
+            }
+            return defaultShiftLength === 12 ? wkDays * 8.0 : wkDays * 7.5;
+        }
+
+        function formatSlovakEuro(val) {
+            return val.toFixed(2).replace('.', ',') + " €";
+        }
 
         // Start initialization
         document.addEventListener('DOMContentLoaded', () => {
