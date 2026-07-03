@@ -1080,6 +1080,14 @@ service cloud.firestore {
                             <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Osobné ohodnotenie (€)</label>
                             <input id="settings-salary-personal" type="number" step="0.01" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-primary" oninput="window.syncSettingsSalary('personal', this.value)">
                         </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Príplatok iné (€)</label>
+                            <input id="settings-salary-other" type="number" step="0.01" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-primary" oninput="window.syncSettingsSalary('other', this.value)">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Dovolenka (nárok dni)</label>
+                            <input id="settings-salary-vacation" type="number" step="0.5" class="w-full bg-brand-slate border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-primary" oninput="window.syncSettingsSalary('vacation', this.value)">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2258,6 +2266,10 @@ service cloud.firestore {
 
             closeEditModal();
             renderRosterUI();
+
+            // Keep personal calendar and statistics in sync
+            window.renderMyCalendar();
+            window.recalculateMyStatsAndSalary();
         };
 
         window.moveEmployee = function(group, idx, direction) {
@@ -3346,6 +3358,10 @@ service cloud.firestore {
 
             closeEditModal();
             renderRosterUI();
+
+            // Keep personal calendar and statistics in sync
+            window.renderMyCalendar();
+            window.recalculateMyStatsAndSalary();
         };
 
         function getSlovakMonthName(mIdx) {
@@ -3529,6 +3545,12 @@ service cloud.firestore {
             } else if (key === 'personalAllowance') {
                 const sPer = document.getElementById('settings-salary-personal');
                 if (sPer) sPer.value = val;
+            } else if (key === 'shiftAllowance') {
+                const sOth = document.getElementById('settings-salary-other');
+                if (sOth) sOth.value = val;
+            } else if (key === 'vacationAllowance') {
+                const sVac = document.getElementById('settings-salary-vacation');
+                if (sVac) sVac.value = val;
             }
             window.recalculateMyStatsAndSalary();
         };
@@ -3546,6 +3568,18 @@ service cloud.firestore {
                     input.value = val;
                     window.updateSalaryConfig('personalAllowance', val);
                 }
+            } else if (type === 'other') {
+                const input = document.getElementById('salary-input-other');
+                if (input) {
+                    input.value = val;
+                    window.updateSalaryConfig('shiftAllowance', val);
+                }
+            } else if (type === 'vacation') {
+                const input = document.getElementById('salary-input-vacation-allowance');
+                if (input) {
+                    input.value = val;
+                    window.updateSalaryConfig('vacationAllowance', val);
+                }
             }
         };
 
@@ -3561,17 +3595,19 @@ service cloud.firestore {
             // Load shift length
             const shiftLen = parseInt(localStorage.getItem('default_shift_length') || '12', 10);
             window.setSettingsShiftLength(shiftLen);
-
+ 
             // Load countdown switch
             document.getElementById('settings-countdown-switch').checked = localStorage.getItem('countdown_enabled') === 'true';
-
+ 
             // Load cleaner switch
             document.getElementById('settings-cleaner-switch').checked = localStorage.getItem('cleaner_enabled') === 'true';
-
+ 
             // Populate salary
             document.getElementById('settings-salary-tariff').value = document.getElementById('salary-input-tariff').value;
             document.getElementById('settings-salary-personal').value = document.getElementById('salary-input-personal').value;
-
+            document.getElementById('settings-salary-other').value = document.getElementById('salary-input-other').value;
+            document.getElementById('settings-salary-vacation').value = document.getElementById('salary-input-vacation-allowance').value;
+ 
             modal.classList.remove('hidden');
         };
 
@@ -4033,6 +4069,18 @@ service cloud.firestore {
                 window.updateCalendarDayDetails(activeEmp, d);
                 // Re-render only to update ring highlights
                 window.renderMyCalendar();
+
+                // Open the cell-edit-modal for the active employee
+                let group = 'top';
+                let empIdx = (window.activeRoster?.topEmployees || []).findIndex(e => e.name === activeEmp.name);
+                if (empIdx === -1) {
+                    group = 'bottom';
+                    empIdx = (window.activeRoster?.bottomEmployees || []).findIndex(e => e.name === activeEmp.name);
+                }
+
+                if (empIdx !== -1) {
+                    window.openEditCellModal(group, empIdx, d);
+                }
             }
         };
 
