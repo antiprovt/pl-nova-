@@ -602,12 +602,12 @@
                                     </span>
                                 </div>
                             </div>
-                            <input type="checkbox" id="month-published-checkbox" onchange="onPublishStateChanged()" class="hidden">
+                            <input type="checkbox" id="month-published-checkbox" onchange="window.onPublishStateChanged()" class="hidden">
                         </div>
 
                         <!-- Cloud Publish Trigger Button -->
                         <div class="flex items-end">
-                            <button onclick="saveRosterToFirestore()" id="btn-save-remote" class="admin-only w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-6 py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20">
+                            <button onclick="window.saveRosterToFirestore()" id="btn-save-remote" class="admin-only w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-6 py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20">
                                 <span class="material-symbols-outlined text-base">public</span>
                                 Uložiť & Zverejniť rozpis v Cloude
                             </button>
@@ -639,10 +639,10 @@
                             <button onclick="window.printRoster()" class="bg-[#90CAF9]/15 hover:bg-[#90CAF9]/25 text-[#90CAF9] border border-[#90CAF9]/30 rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5 shadow-lg">
                                 <span class="material-symbols-outlined text-base">print</span> Tlačiť / PDF
                             </button>
-                            <button onclick="openAddEmployeeModal()" class="admin-only bg-[#90CAF9]/10 hover:bg-[#90CAF9]/20 text-[#90CAF9] border border-[#90CAF9]/20 rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5">
+                            <button onclick="window.openAddEmployeeModal()" class="admin-only bg-[#90CAF9]/10 hover:bg-[#90CAF9]/20 text-[#90CAF9] border border-[#90CAF9]/20 rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-base">person_add</span> Pridať príslušníka
                             </button>
-                            <button onclick="resetRosterToFallback()" class="admin-only bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5">
+                            <button onclick="window.resetRosterToFallback()" class="admin-only bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-base">restart_alt</span> Obnoviť do fallbacku
                             </button>
                         </div>
@@ -856,13 +856,13 @@ service cloud.firestore {
 
     <!-- Modal dialogue: Edit Shift Cells -->
     <div id="cell-edit-modal" class="hidden fixed inset-0 bg-brand-slate/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-        <div class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        <div class="bg-brand-navy border border-[#233044] rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
             <div class="flex justify-between items-start">
                 <div>
                     <h3 id="modal-employee-name" class="text-lg font-bold text-white">Editor Smeny</h3>
                     <p id="modal-shift-date" class="text-xs text-gray-400 mt-0.5">Dátum: --</p>
                 </div>
-                <button onclick="closeEditModal()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
+                <button onclick="window.closeEditModal()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
@@ -876,19 +876,19 @@ service cloud.firestore {
                         <div>
                             <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Typ služby / Status dňa</label>
                             <div class="grid grid-cols-4 gap-2">
-                                <button onclick="setModalPresets('SR', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">SR (11,5)</button>
-                                <button onclick="setModalPresets('SN', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">SN (11,5)</button>
-                                <button onclick="setModalPresets('R', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">R (11,5)</button>
-                                <button onclick="setModalPresets('N', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">N (11,5)</button>
-                                <button onclick="setModalPresets('PR', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">PR (11,5)</button>
-                                <button onclick="setModalPresets('PN', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">PN (11,5)</button>
-                                <button onclick="setModalPresets('P', '7,5')" style="background-color: #64748B; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#64748B]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">P (7,5)</button>
-                                <button onclick="setModalPresets('D', '7,5')" style="background-color: #FFEA00; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#FFEA00]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">D (7,5)</button>
-                                <button onclick="setModalPresets('CH', '7,5')" style="background-color: #14532D; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#14532D]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">CH (7,5)</button>
-                                <button onclick="setModalPresets('Par', '7,5')" style="background-color: #06B6D4; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#06B6D4]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">Par (7,5)</button>
-                                <button onclick="setModalPresets('KZ', '11,5')" style="background-color: #D946EF; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#D946EF]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">KZ (11,5)</button>
-                                <button onclick="setModalPresets('V', '7,5')" style="background-color: #8B5A2B; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#8B5A2B]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">V (7,5)</button>
-                                <button onclick="setModalPresets('', '')" style="background-color: #475569; color: #F1F5F9;" class="col-span-4 py-3 text-xs font-extrabold rounded-xl border border-gray-700 hover:bg-gray-800 transition transform hover:scale-[1.01] active:scale-95 shadow-sm flex items-center justify-center gap-1">
+                                <button onclick="window.setModalPresets('SR', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">SR (11,5)</button>
+                                <button onclick="window.setModalPresets('SN', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">SN (11,5)</button>
+                                <button onclick="window.setModalPresets('R', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">R (11,5)</button>
+                                <button onclick="window.setModalPresets('N', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">N (11,5)</button>
+                                <button onclick="window.setModalPresets('PR', '11,5')" style="background-color: #86EFAC; color: #052E16;" class="py-2.5 text-xs font-bold rounded-xl border border-[#86EFAC]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">PR (11,5)</button>
+                                <button onclick="window.setModalPresets('PN', '11,5')" style="background-color: #3B82F6; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#3B82F6]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">PN (11,5)</button>
+                                <button onclick="window.setModalPresets('P', '7,5')" style="background-color: #64748B; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#64748B]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">P (7,5)</button>
+                                <button onclick="window.setModalPresets('D', '7,5')" style="background-color: #FFEA00; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#FFEA00]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">D (7,5)</button>
+                                <button onclick="window.setModalPresets('CH', '7,5')" style="background-color: #14532D; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#14532D]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">CH (7,5)</button>
+                                <button onclick="window.setModalPresets('Par', '7,5')" style="background-color: #06B6D4; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#06B6D4]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">Par (7,5)</button>
+                                <button onclick="window.setModalPresets('KZ', '11,5')" style="background-color: #D946EF; color: #000000;" class="py-2.5 text-xs font-bold rounded-xl border border-[#D946EF]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">KZ (11,5)</button>
+                                <button onclick="window.setModalPresets('V', '7,5')" style="background-color: #8B5A2B; color: #FFFFFF;" class="py-2.5 text-xs font-bold rounded-xl border border-[#8B5A2B]/20 transition transform hover:scale-[1.03] active:scale-95 shadow-sm">V (7,5)</button>
+                                <button onclick="window.setModalPresets('', '')" style="background-color: #475569; color: #F1F5F9;" class="col-span-4 py-3 text-xs font-extrabold rounded-xl border border-gray-700 hover:bg-gray-800 transition transform hover:scale-[1.01] active:scale-95 shadow-sm flex items-center justify-center gap-1">
                                     <span class="material-symbols-outlined text-sm">delete</span> Voľno (Zrušiť smenu)
                                 </button>
                             </div>
@@ -917,8 +917,8 @@ service cloud.firestore {
                                     </select>
                                     <span class="material-symbols-outlined absolute right-2 top-2 text-gray-400 pointer-events-none text-xs">expand_more</span>
                                 </div>
-                                <button onclick="executeMoveOrCopyShift(false)" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-2 rounded-lg text-xs transition flex items-center justify-center">Kopírovať</button>
-                                <button onclick="executeMoveOrCopyShift(true)" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-2 rounded-lg text-xs transition flex items-center justify-center">Presunúť</button>
+                                <button onclick="window.executeMoveOrCopyShift(false)" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-2 rounded-lg text-xs transition flex items-center justify-center">Kopírovať</button>
+                                <button onclick="window.executeMoveOrCopyShift(true)" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-2 rounded-lg text-xs transition flex items-center justify-center">Presunúť</button>
                             </div>
                         </div>
 
@@ -942,10 +942,10 @@ service cloud.firestore {
             </div>
 
             <div class="flex gap-3 pt-3">
-                <button onclick="closeEditModal()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-3 rounded-xl transition">
+                <button onclick="window.closeEditModal()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-3 rounded-xl transition">
                     Zrušiť
                 </button>
-                <button onclick="submitModalShiftChange()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition shadow-lg shadow-brand-primary/10">
+                <button onclick="window.submitModalShiftChange()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition shadow-lg shadow-brand-primary/10">
                     Potvrdiť & Uložiť
                 </button>
             </div>
@@ -960,7 +960,7 @@ service cloud.firestore {
                     <h3 class="text-lg font-bold text-white">Pridať zamestnanca</h3>
                     <p class="text-xs text-gray-400 mt-0.5">Vytvorte nového zamestnanca v systéme</p>
                 </div>
-                <button onclick="closeAddEmployeeModal()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
+                <button onclick="window.closeAddEmployeeModal()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
@@ -984,10 +984,10 @@ service cloud.firestore {
             </div>
 
             <div class="flex gap-3 pt-3">
-                <button onclick="closeAddEmployeeModal()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-3 rounded-xl transition">
+                <button onclick="window.closeAddEmployeeModal()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-3 rounded-xl transition">
                     Zrušiť
                 </button>
-                <button onclick="submitAddEmployee()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition shadow-lg shadow-brand-primary/10">
+                <button onclick="window.submitAddEmployee()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-3 rounded-xl transition shadow-lg shadow-brand-primary/10">
                     Pridať do tabuľky
                 </button>
             </div>
@@ -2264,7 +2264,7 @@ service cloud.firestore {
             window.hasUnsavedChanges = true;
             window.updatePublishUI();
 
-            closeEditModal();
+            window.closeEditModal();
             renderRosterUI();
 
             // Keep personal calendar and statistics in sync
@@ -3122,13 +3122,13 @@ service cloud.firestore {
                 if (window.canEdit) {
                     actionControlsHtml = `
                     <div class="flex items-center gap-1 shrink-0 ml-2">
-                        <button onclick="moveEmployee('${group}', ${empIdx}, 'up')" class="text-gray-400 hover:text-white select-none mr-0.5" title="Posunúť hore">
+                        <button onclick="window.moveEmployee('${group}', ${empIdx}, 'up')" class="text-gray-400 hover:text-white select-none mr-0.5" title="Posunúť hore">
                             <span class="material-symbols-outlined text-[15px]">arrow_upward</span>
                         </button>
-                        <button onclick="moveEmployee('${group}', ${empIdx}, 'down')" class="text-gray-400 hover:text-white select-none mr-1" title="Posunúť dole">
+                        <button onclick="window.moveEmployee('${group}', ${empIdx}, 'down')" class="text-gray-400 hover:text-white select-none mr-1" title="Posunúť dole">
                             <span class="material-symbols-outlined text-[15px]">arrow_downward</span>
                         </button>
-                        <button onclick="removeEmployee('${group}', ${empIdx})" class="text-red-500 hover:text-red-400 select-none" title="Vymazať zamestnanca">
+                        <button onclick="window.removeEmployee('${group}', ${empIdx})" class="text-red-500 hover:text-red-400 select-none" title="Vymazať zamestnanca">
                             <span class="material-symbols-outlined text-[15px]">delete</span>
                         </button>
                     </div>`;
@@ -3183,7 +3183,7 @@ service cloud.firestore {
                         }
                     }
 
-                    rowsHtml += `<td onclick="openEditCellModal('${group}', ${empIdx}, ${d})" style="${customStyle}" class="px-1 py-1.5 border-r border-gray-800 text-center cursor-pointer select-none border-b border-gray-800 hover:scale-105 transition hover:shadow-inner ${bgCell} min-h-[36px]">
+                    rowsHtml += `<td onclick="window.openEditCellModal('${group}', ${empIdx}, ${d})" style="${customStyle}" class="px-1 py-1.5 border-r border-gray-800 text-center cursor-pointer select-none border-b border-gray-800 hover:scale-105 transition hover:shadow-inner ${bgCell} min-h-[36px]">
                         <div class="text-[11px] leading-tight font-bold">${cellCode || ''}</div>
                         <div class="text-[9px] leading-tight opacity-75 font-normal">${cellHours ? cellHours : ''}</div>
                     </td>`;
@@ -3322,7 +3322,7 @@ service cloud.firestore {
         };
 
         window.updateModalActivePresetHighlight = function(code) {
-            const buttons = document.querySelectorAll('#cell-edit-modal button[onclick^="setModalPresets"]');
+            const buttons = document.querySelectorAll('#cell-edit-modal button[onclick*="setModalPresets"]');
             buttons.forEach(btn => {
                 const match = btn.getAttribute('onclick').match(/setModalPresets\('([^']*)'/);
                 const btnCode = match ? match[1] : '';
@@ -3376,7 +3376,7 @@ service cloud.firestore {
             window.hasUnsavedChanges = true;
             window.updatePublishUI();
 
-            closeEditModal();
+            window.closeEditModal();
             renderRosterUI();
 
             // Keep personal calendar and statistics in sync
@@ -4662,7 +4662,7 @@ service cloud.firestore {
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Meno z rozpisu</label>
                     <div class="relative">
-                        <input id="login-username" oninput="onLoginUsernameChanged()" type="text" placeholder="Zadajte presné meno" class="w-full bg-brand-slate border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary transition">
+                        <input id="login-username" oninput="window.onLoginUsernameChanged()" type="text" placeholder="Zadajte presné meno" class="w-full bg-brand-slate border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary transition">
                         <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400 text-lg">person</span>
                     </div>
                 </div>
@@ -4674,7 +4674,7 @@ service cloud.firestore {
                         <input id="login-email" type="email" placeholder="napriklad@email.com" class="w-full bg-brand-slate border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary transition">
                         <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400 text-lg">mail</span>
                     </div>
-                    <button onclick="sendWebEmailCode()" class="w-full bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/20 font-semibold py-2.5 rounded-xl text-xs transition">
+                    <button onclick="window.sendWebEmailCode()" class="w-full bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/20 font-semibold py-2.5 rounded-xl text-xs transition">
                         Odoslať kód na e-mail
                     </button>
                 </div>
@@ -4685,7 +4685,7 @@ service cloud.firestore {
                     <div class="relative flex items-center">
                         <input id="login-password" type="password" placeholder="Zadajte heslo" class="w-full bg-brand-slate border border-gray-700 rounded-xl pl-10 pr-10 py-3 text-sm text-white focus:outline-none focus:border-brand-primary transition">
                         <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400 text-lg">lock</span>
-                        <button onclick="togglePasswordVisibility()" class="absolute right-3 focus:outline-none text-gray-400 hover:text-white transition">
+                        <button onclick="window.togglePasswordVisibility()" class="absolute right-3 focus:outline-none text-gray-400 hover:text-white transition">
                             <span id="password-visibility-icon" class="material-symbols-outlined text-lg">visibility</span>
                         </button>
                     </div>
@@ -4697,12 +4697,12 @@ service cloud.firestore {
                 </div>
 
                 <!-- Submit Button -->
-                <button onclick="submitWebLogin()" class="w-full bg-brand-primary hover:bg-brand-secondary text-brand-slate font-extrabold py-3.5 rounded-xl text-sm transition shadow-lg shadow-brand-primary/10 mt-2">
+                <button onclick="window.submitWebLogin()" class="w-full bg-brand-primary hover:bg-brand-secondary text-brand-slate font-extrabold py-3.5 rounded-xl text-sm transition shadow-lg shadow-brand-primary/10 mt-2">
                     Prihlásiť sa
                 </button>
 
                 <!-- Forgot password button -->
-                <button onclick="openForgotPasswordDialog()" class="w-full text-center text-xs font-semibold text-brand-primary hover:text-brand-secondary transition py-2 mt-1">
+                <button onclick="window.openForgotPasswordDialog()" class="w-full text-center text-xs font-semibold text-brand-primary hover:text-brand-secondary transition py-2 mt-1">
                     Zabudol som heslo
                 </button>
             </div>
@@ -4721,7 +4721,7 @@ service cloud.firestore {
             </div>
             <p class="text-xs text-gray-500">Tento kód skopírujte a zadajte do textového poľa pre prihlásenie.</p>
             
-            <button onclick="closeSentCodeModal()" class="w-full bg-brand-slate hover:bg-gray-800 text-white font-semibold py-3 rounded-xl transition text-sm">
+            <button onclick="window.closeSentCodeModal()" class="w-full bg-brand-slate hover:bg-gray-800 text-white font-semibold py-3 rounded-xl transition text-sm">
                 Rozumiem
             </button>
         </div>
@@ -4732,7 +4732,7 @@ service cloud.firestore {
         <div class="bg-brand-navy border border-gray-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
             <div class="flex justify-between items-start">
                 <h3 class="text-lg font-bold text-brand-primary">Zabudol som heslo</h3>
-                <button onclick="closeForgotPasswordDialog()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
+                <button onclick="window.closeForgotPasswordDialog()" class="text-gray-400 hover:text-white rounded-full p-1 bg-brand-slate hover:bg-gray-800 transition">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
@@ -4754,10 +4754,10 @@ service cloud.firestore {
             </div>
 
             <div class="flex gap-3 pt-2">
-                <button onclick="closeForgotPasswordDialog()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-2.5 rounded-xl transition text-xs">
+                <button onclick="window.closeForgotPasswordDialog()" class="flex-1 bg-brand-slate hover:bg-gray-800 text-gray-300 font-medium py-2.5 rounded-xl transition text-xs">
                     Zrušiť
                 </button>
-                <button id="forgot-submit-btn" onclick="submitForgotPasswordWeb()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-2.5 rounded-xl transition text-xs">
+                <button id="forgot-submit-btn" onclick="window.submitForgotPasswordWeb()" class="flex-1 bg-brand-primary hover:bg-brand-secondary text-brand-slate font-bold py-2.5 rounded-xl transition text-xs">
                     Odoslať nové heslo
                 </button>
             </div>
