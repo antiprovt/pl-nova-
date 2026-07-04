@@ -4103,18 +4103,6 @@ service cloud.firestore {
                 window.updateCalendarDayDetails(activeEmp, d);
                 // Re-render only to update ring highlights
                 window.renderMyCalendar();
-
-                // Open the cell-edit-modal for the active employee
-                let group = 'top';
-                let empIdx = (window.activeRoster?.topEmployees || []).findIndex(e => e.name === activeEmp.name);
-                if (empIdx === -1) {
-                    group = 'bottom';
-                    empIdx = (window.activeRoster?.bottomEmployees || []).findIndex(e => e.name === activeEmp.name);
-                }
-
-                if (empIdx !== -1) {
-                    window.openEditCellModal(group, empIdx, d);
-                }
             }
         };
 
@@ -4161,22 +4149,46 @@ service cloud.firestore {
 
             // If user has admin rights, render inputs
             if (editable) {
+                const activeCode = (shift.code || '').toUpperCase();
+                
+                const getBtnClass = (code) => {
+                    const baseClass = "py-2 rounded-lg transition font-black text-center text-xs flex items-center justify-center ";
+                    const isActive = activeCode === code;
+                    const ringClass = isActive ? " ring-4 ring-white scale-105 z-10 shadow-lg font-extrabold" : " opacity-75 hover:opacity-100";
+                    
+                    if (code === 'SR' || code === 'R' || code === 'PR' || code === 'CH') {
+                        return baseClass + (isActive ? "bg-emerald-500 text-brand-slate" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20") + ringClass;
+                    } else if (code === 'SN' || code === 'N' || code === 'PN') {
+                        return baseClass + (isActive ? "bg-blue-500 text-white" : "bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20") + ringClass;
+                    } else if (code === 'P') {
+                        return baseClass + (isActive ? "bg-slate-500 text-white" : "bg-slate-500/10 text-slate-400 border border-slate-500/20 hover:bg-slate-500/20") + ringClass;
+                    } else if (code === 'D') {
+                        return baseClass + (isActive ? "bg-yellow-500 text-black" : "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 hover:bg-yellow-500/20") + ringClass;
+                    } else if (code === 'PAR') {
+                        return baseClass + (isActive ? "bg-cyan-500 text-brand-slate" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20") + ringClass;
+                    } else if (code === 'KZ') {
+                        return baseClass + (isActive ? "bg-pink-500 text-brand-slate" : "bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20") + ringClass;
+                    } else { // VOĽNO / null
+                        return baseClass + (isActive ? "bg-gray-600 text-white border border-gray-500" : "bg-brand-slate text-gray-400 border border-gray-700 hover:text-white") + ringClass;
+                    }
+                };
+
                 html += `
                     <div class="bg-[#0B1220]/60 p-4 rounded-2xl border border-gray-800 space-y-3.5">
-                        <div class="text-[10px] font-bold text-brand-primary uppercase tracking-widest">Rýchle predvoľby (Admin)</div>
+                        <div class="text-[10px] font-bold text-brand-primary uppercase tracking-widest">Rýchle predvoľby služby</div>
                         <div class="grid grid-cols-4 gap-1.5 text-[10px] font-black">
-                            <button onclick="window.setCalendarPreset('SR', '11,5')" class="py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition">SR</button>
-                            <button onclick="window.setCalendarPreset('SN', '11,5')" class="py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition">SN</button>
-                            <button onclick="window.setCalendarPreset('R', '7,5')" class="py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition">R</button>
-                            <button onclick="window.setCalendarPreset('N', '11,5')" class="py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition">N</button>
-                            <button onclick="window.setCalendarPreset('PR', '11,5')" class="py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition">PR</button>
-                            <button onclick="window.setCalendarPreset('PN', '11,5')" class="py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition">PN</button>
-                            <button onclick="window.setCalendarPreset('P', '7,5')" class="py-2 rounded-lg bg-slate-500/10 text-slate-400 border border-slate-500/20 hover:bg-slate-500/20 transition">P</button>
-                            <button onclick="window.setCalendarPreset('D', '11,5')" class="py-2 rounded-lg bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 hover:bg-yellow-500/20 transition">D</button>
-                            <button onclick="window.setCalendarPreset('CH', '11,5')" class="py-2 rounded-lg bg-emerald-800/10 text-emerald-400 border border-emerald-800/20 hover:bg-[#14532d]/40 transition">CH</button>
-                            <button onclick="window.setCalendarPreset('PAR', '11,5')" class="py-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition">PAR</button>
-                            <button onclick="window.setCalendarPreset('KZ', '11,5')" class="py-2 rounded-lg bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20 transition">KZ</button>
-                            <button onclick="window.setCalendarPreset(null, null)" class="py-2 rounded-lg bg-brand-slate text-gray-400 border border-gray-700 hover:text-white transition">VOĽNO</button>
+                            <button onclick="window.setCalendarPreset('SR', '11,5')" class="${getBtnClass('SR')}">SR</button>
+                            <button onclick="window.setCalendarPreset('SN', '11,5')" class="${getBtnClass('SN')}">SN</button>
+                            <button onclick="window.setCalendarPreset('R', '7,5')" class="${getBtnClass('R')}">R</button>
+                            <button onclick="window.setCalendarPreset('N', '11,5')" class="${getBtnClass('N')}">N</button>
+                            <button onclick="window.setCalendarPreset('PR', '11,5')" class="${getBtnClass('PR')}">PR</button>
+                            <button onclick="window.setCalendarPreset('PN', '11,5')" class="${getBtnClass('PN')}">PN</button>
+                            <button onclick="window.setCalendarPreset('P', '7,5')" class="${getBtnClass('P')}">P</button>
+                            <button onclick="window.setCalendarPreset('D', '11,5')" class="${getBtnClass('D')}">D</button>
+                            <button onclick="window.setCalendarPreset('CH', '11,5')" class="${getBtnClass('CH')}">CH</button>
+                            <button onclick="window.setCalendarPreset('PAR', '11,5')" class="${getBtnClass('PAR')}">PAR</button>
+                            <button onclick="window.setCalendarPreset('KZ', '11,5')" class="${getBtnClass('KZ')}">KZ</button>
+                            <button onclick="window.setCalendarPreset(null, null)" class="${getBtnClass('')}">VOĽNO</button>
                         </div>
                         
                         <div class="grid grid-cols-2 gap-3 pt-1">
@@ -4222,6 +4234,9 @@ service cloud.firestore {
             const hoursInput = document.getElementById('calendar-edit-hours');
             if (codeInput) codeInput.value = code || '';
             if (hoursInput) hoursInput.value = hours || '';
+            
+            // Automatically submit and save the change immediately!
+            window.submitCalendarShiftChange(window.selectedCalendarDay);
         };
 
         window.submitCalendarShiftChange = function(d) {
