@@ -732,6 +732,51 @@
         </div>
     </div>
 
+    <!-- MODAL: MANAGE EMPLOYEE (EDIT/DELETE) -->
+    <div id="manage-employee-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl relative overflow-hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <i data-lucide="user-cog" class="text-blue-400 w-5 h-5"></i>
+                    Upraviť Zamestnanca
+                </h3>
+                <button onclick="window.closeManageEmployeeModal()" class="p-1 text-slate-400 hover:text-white rounded-lg transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="manage-emp-name" class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Meno</label>
+                    <input type="text" id="manage-emp-name" class="bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-slate-100 w-full focus:outline-none">
+                </div>
+                
+                <div>
+                    <label for="manage-emp-group" class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Skupina (Rola)</label>
+                    <select id="manage-emp-group" class="bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-slate-200 w-full focus:outline-none">
+                        <option value="top">Vedúci / Operátori</option>
+                        <option value="bottom">Strážna Služba / Technici</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-2 pt-2 border-t border-slate-800">
+                    <div class="flex gap-2">
+                        <button onclick="window.closeManageEmployeeModal()" class="flex-1 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition">
+                            Zrušiť
+                        </button>
+                        <button onclick="window.saveManagedEmployee()" class="flex-1 py-2 text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition shadow-lg">
+                            Uložiť
+                        </button>
+                    </div>
+                    <button onclick="window.deleteEmployee()" class="w-full py-2 text-xs bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/20 rounded-xl font-bold transition flex items-center justify-center gap-1.5 mt-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        Vymazať zamestnanca
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- APP LOGIC SCRIPT -->
     <script>
@@ -780,13 +825,19 @@
                 topEmployees: [
                     { id: 't1', name: "Rieger T.", role: "veduci", shifts: {} },
                     { id: 't2', name: "Horváth M.", role: "operator", shifts: {} },
-                    { id: 't3', name: "Kováč J.", role: "operator", shifts: {} }
+                    { id: 't3', name: "Kováč J.", role: "operator", shifts: {} },
+                    { id: 't4', name: "Tóth A.", role: "operator", shifts: {} },
+                    { id: 't5', name: "Nagy M.", role: "operator", shifts: {} }
                 ],
                 bottomEmployees: [
                     { id: 'b1', name: "Baláž P.", role: "straz", shifts: {} },
                     { id: 'b2', name: "Molnár L.", role: "straz", shifts: {} },
                     { id: 'b3', name: "Szabó Z.", role: "straz", shifts: {} },
-                    { id: 'b4', name: "Varga F.", role: "straz", shifts: {} }
+                    { id: 'b4', name: "Varga F.", role: "straz", shifts: {} },
+                    { id: 'b5', name: "Krajčovič R.", role: "straz", shifts: {} },
+                    { id: 'b6', name: "Polák D.", role: "straz", shifts: {} },
+                    { id: 'b7', name: "Novák M.", role: "straz", shifts: {} },
+                    { id: 'b8', name: "Kučera F.", role: "straz", shifts: {} }
                 ]
             };
         }
@@ -858,38 +909,38 @@
                 // Inject some pre-populated shifts for demo purposes if it's new
                 const roster = window.rostersByMonth[key];
                 
-                // Let's populate some shifts in July (0-indexed = 6)
-                if (window.activeMonthIndex === 6) {
-                    const sampleShifts = ['R', null, 'N', null, 'R', null, 'D', null, 'PR', 'PN', null, null, 'SR', 'SN', null, 'R', 'N', null, 'Par', 'KZ', null, 'R', 'N', null, null, 'D', 'D', 'CH', 'CH', null, 'R'];
-                    roster.topEmployees.forEach((emp, empIdx) => {
-                        for (let d = 1; d <= 31; d++) {
-                            const shiftIndex = (d + empIdx * 5) % sampleShifts.length;
-                            const shift = sampleShifts[shiftIndex];
-                            if (shift) {
-                                emp.shifts[d] = {
-                                    code: shift,
-                                    hours: (shift === 'SR' || shift === 'SN' || shift === 'D' || shift === 'CH' || shift === 'Par') ? 7.5 : 11.5,
-                                    overtime: 0,
-                                    note: ""
-                                };
-                            }
+                // Populate shifts dynamically for any month, offset by month index
+                const sampleShifts = ['R', null, 'N', null, 'R', null, 'D', null, 'PR', 'PN', null, null, 'SR', 'SN', null, 'R', 'N', null, 'Par', 'KZ', null, 'R', 'N', null, null, 'D', 'D', 'CH', 'CH', null, 'R'];
+                const daysInMonth = getDaysInMonth(CURRENT_YEAR, window.activeMonthIndex);
+                
+                roster.topEmployees.forEach((emp, empIdx) => {
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const shiftIndex = (d + empIdx * 5 + window.activeMonthIndex * 3) % sampleShifts.length;
+                        const shift = sampleShifts[shiftIndex];
+                        if (shift) {
+                            emp.shifts[d] = {
+                                code: shift,
+                                hours: (shift === 'SR' || shift === 'SN' || shift === 'D' || shift === 'CH' || shift === 'Par') ? 7.5 : 11.5,
+                                overtime: 0,
+                                note: ""
+                            };
                         }
-                    });
-                    roster.bottomEmployees.forEach((emp, empIdx) => {
-                        for (let d = 1; d <= 31; d++) {
-                            const shiftIndex = (d + empIdx * 7) % sampleShifts.length;
-                            const shift = sampleShifts[shiftIndex];
-                            if (shift) {
-                                emp.shifts[d] = {
-                                    code: shift,
-                                    hours: (shift === 'SR' || shift === 'SN' || shift === 'D' || shift === 'CH' || shift === 'Par') ? 7.5 : 11.5,
-                                    overtime: 0,
-                                    note: ""
-                                };
-                            }
+                    }
+                });
+                roster.bottomEmployees.forEach((emp, empIdx) => {
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const shiftIndex = (d + empIdx * 7 + window.activeMonthIndex * 2) % sampleShifts.length;
+                        const shift = sampleShifts[shiftIndex];
+                        if (shift) {
+                            emp.shifts[d] = {
+                                code: shift,
+                                hours: (shift === 'SR' || shift === 'SN' || shift === 'D' || shift === 'CH' || shift === 'Par') ? 7.5 : 11.5,
+                                overtime: 0,
+                                note: ""
+                            };
                         }
-                    });
-                }
+                    }
+                });
                 saveStateToStorage();
             }
             return window.rostersByMonth[key];
@@ -1292,12 +1343,18 @@
 
                 const isMe = emp.name === window.currentEmployeeName;
                 const highlightMe = isMe ? 'border-l-4 border-l-blue-500 font-bold bg-blue-950/10' : '';
+                const isAdmin = window.currentUserRole === 'administrator';
+                const cursorStyle = isAdmin ? 'cursor-pointer hover:bg-slate-800/80 transition-all' : '';
+                const clickHandler = isAdmin ? `onclick="window.openManageEmployeeModal('${group}', ${empIdx})"` : '';
 
                 // Employee Name Sticky column
                 let html = `
-                    <td class="p-3 first-col-sticky text-xs border-r border-slate-800 flex items-center justify-between gap-1 ${highlightMe}">
+                    <td ${clickHandler} class="p-3 first-col-sticky text-xs border-r border-slate-800 flex items-center justify-between gap-1 ${highlightMe} ${cursorStyle}">
                         <div class="flex flex-col">
-                            <span class="text-slate-200 font-bold">${emp.name}</span>
+                            <span class="text-slate-200 font-bold flex items-center gap-1">
+                                ${emp.name}
+                                ${isAdmin ? '<i data-lucide="pencil" class="w-2.5 h-2.5 text-blue-400/80"></i>' : ''}
+                            </span>
                             <span class="text-[9px] text-slate-500 capitalize">${emp.role === 'veduci' ? 'Vedúci' : emp.role === 'straz' ? 'Strážca' : 'Operátor'}</span>
                         </div>
                         ${isMe ? '<span class="text-[8px] bg-blue-500/20 text-blue-400 font-black px-1.5 py-0.5 rounded uppercase">Ja</span>' : ''}
@@ -1667,6 +1724,100 @@
             window.closeAddEmployeeModal();
             document.getElementById('add-emp-name').value = "";
             alert(`Zamestnanec ${name} bol úspešne pridaný!`);
+        };
+
+        // MANAGE EMPLOYEE MODAL (EDIT/DELETE)
+        window.openManageEmployeeModal = function(group, empIdx) {
+            if (window.currentUserRole !== 'administrator') {
+                return; // Only admins can manage employees
+            }
+            const roster = window.getActiveRoster();
+            const list = group === 'top' ? roster.topEmployees : roster.bottomEmployees;
+            const emp = list[empIdx];
+            
+            window.managingEmployeeState = { group, empIdx };
+            
+            document.getElementById('manage-emp-name').value = emp.name;
+            document.getElementById('manage-emp-group').value = group;
+            
+            document.getElementById('manage-employee-modal').classList.remove('hidden');
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        };
+
+        window.closeManageEmployeeModal = function() {
+            document.getElementById('manage-employee-modal').classList.add('hidden');
+        };
+
+        window.saveManagedEmployee = function() {
+            const state = window.managingEmployeeState;
+            if (!state) return;
+            
+            const name = document.getElementById('manage-emp-name').value.trim();
+            const targetGroup = document.getElementById('manage-emp-group').value;
+            
+            if (!name) {
+                alert("Meno nemôže byť prázdne!");
+                return;
+            }
+            
+            const roster = window.getActiveRoster();
+            const currentList = state.group === 'top' ? roster.topEmployees : roster.bottomEmployees;
+            const emp = currentList[state.empIdx];
+            
+            const oldName = emp.name;
+            emp.name = name;
+            
+            if (state.group !== targetGroup) {
+                // Change group
+                emp.role = targetGroup === 'top' ? 'operator' : 'straz';
+                // Remove from current group
+                currentList.splice(state.empIdx, 1);
+                // Add to new group
+                const newList = targetGroup === 'top' ? roster.topEmployees : roster.bottomEmployees;
+                newList.push(emp);
+                
+                // If it was me, update active employee name
+                if (window.currentEmployeeName === oldName) {
+                    window.currentEmployeeName = name;
+                }
+            } else {
+                // Group is same, just update name
+                if (window.currentEmployeeName === oldName) {
+                    window.currentEmployeeName = name;
+                }
+            }
+            
+            saveStateToStorage();
+            window.renderTeamRoster();
+            if (window.renderSettings) window.renderSettings();
+            document.getElementById('logged-user-label').textContent = window.currentEmployeeName;
+            window.closeManageEmployeeModal();
+            alert("Meno a skupina úspešne zmenené!");
+        };
+
+        window.deleteEmployee = function() {
+            const state = window.managingEmployeeState;
+            if (!state) return;
+            
+            const roster = window.getActiveRoster();
+            const list = state.group === 'top' ? roster.topEmployees : roster.bottomEmployees;
+            const emp = list[state.empIdx];
+            
+            if (emp.name === window.currentEmployeeName) {
+                alert("Nemôžete vymazať seba samého zo systému!");
+                return;
+            }
+            
+            if (confirm(`Naozaj chcete vymazať zamestnanca ${emp.name} a všetky jeho služby?`)) {
+                list.splice(state.empIdx, 1);
+                saveStateToStorage();
+                window.renderTeamRoster();
+                if (window.renderSettings) window.renderSettings();
+                window.closeManageEmployeeModal();
+                alert(`Zamestnanec bol vymazaný.`);
+            }
         };
 
         // PRINT/EXPORT ROSTER
