@@ -3291,7 +3291,8 @@ service cloud.firestore {
             
             const isPreviousMonth = window.activeMonthIndex < getCurrentRosterMonthIndex();
             const isOwnProfile = emp && (emp.name === window.currentEmployeeName);
-            if ((window.canEdit || isOwnProfile) && !isPreviousMonth) {
+            const isShichterActive = document.getElementById('view-shichter') && !document.getElementById('view-shichter').classList.contains('hidden');
+            if ((window.canEdit || isOwnProfile || isShichterActive) && !isPreviousMonth) {
                 adminElements.forEach(el => el.classList.remove('hidden'));
                 empOnlyView.classList.add('hidden');
                 
@@ -3351,8 +3352,9 @@ service cloud.firestore {
             const list = group === 'top' ? window.activeRoster.topEmployees : window.activeRoster.bottomEmployees;
             const emp = list[empIdx];
             const isOwnProfile = emp && (emp.name === window.currentEmployeeName);
+            const isShichterActive = document.getElementById('view-shichter') && !document.getElementById('view-shichter').classList.contains('hidden');
 
-            if (!window.canEdit && !isOwnProfile) {
+            if (!window.canEdit && !isOwnProfile && !isShichterActive) {
                 alert("Ako bežný zamestnanec nemáte oprávnenie na úpravu rozpisu iných zamestnancov!");
                 return;
             }
@@ -4125,7 +4127,8 @@ service cloud.firestore {
             const shift = emp.shifts[d] || { code: null, hours: null };
             const isPrevMonth = window.activeMonthIndex < getCurrentRosterMonthIndex();
             const isOwnProfile = emp.name === window.currentEmployeeName;
-            const editable = (window.canEdit || isOwnProfile) && !isPrevMonth;
+            const isShichterActive = document.getElementById('view-shichter') && !document.getElementById('view-shichter').classList.contains('hidden');
+            const editable = (window.canEdit || isOwnProfile || isShichterActive) && !isPrevMonth;
 
             let html = '';
 
