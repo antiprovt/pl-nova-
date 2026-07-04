@@ -4103,6 +4103,18 @@ service cloud.firestore {
                 window.updateCalendarDayDetails(activeEmp, d);
                 // Re-render only to update ring highlights
                 window.renderMyCalendar();
+
+                // Open the cell-edit-modal for the active employee
+                let group = 'top';
+                let empIdx = (window.activeRoster?.topEmployees || []).findIndex(e => e.name === activeEmp.name);
+                if (empIdx === -1) {
+                    group = 'bottom';
+                    empIdx = (window.activeRoster?.bottomEmployees || []).findIndex(e => e.name === activeEmp.name);
+                }
+
+                if (empIdx !== -1) {
+                    window.openEditCellModal(group, empIdx, d);
+                }
             }
         };
 
