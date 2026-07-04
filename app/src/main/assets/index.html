@@ -1498,7 +1498,7 @@
             });
 
             // Summary notes updates
-            document.getElementById('stats-summary-desc-1').textContent = `V mesiaci ${MONTH_NAMES[window.activeMonthIndex]} ste mali plánovaných ${workedDays} zmien a ${freeDays} voľných dní.`;
+            document.getElementById('stats-summary-desc-1').textContent = `V mesiaci ${MONTH_NAMES[window.activeMonthIndex]} ste mali plánovaných ${workedDays} zmien and ${freeDays} voľných dní.`;
             const avgShiftHours = workedDays > 0 ? (totalHours / workedDays) : 0;
             document.getElementById('stats-summary-desc-2').textContent = `Priemerná dĺžka vašej pracovnej zmeny bola ${avgShiftHours.toFixed(1)} hodiny. Spolu so surchargemi ste získali odhadom ${netWageStr} v čistom.`;
         };
