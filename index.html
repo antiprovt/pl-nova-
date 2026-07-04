@@ -3298,6 +3298,9 @@ service cloud.firestore {
                 document.getElementById('modal-input-code').value = cell.code || '';
                 document.getElementById('modal-input-hours').value = cell.hours || '';
                 
+                // Highlight active preset
+                window.updateModalActivePresetHighlight(cell.code || '');
+                
                 // Populate move options dropdown dynamically
                 const targetDaysSelect = document.getElementById('modal-move-target-day');
                 const targetLen = getLengthOfMonth(window.activeMonthIndex);
@@ -3318,9 +3321,23 @@ service cloud.firestore {
             document.getElementById('cell-edit-modal').classList.remove('hidden');
         };
 
+        window.updateModalActivePresetHighlight = function(code) {
+            const buttons = document.querySelectorAll('#cell-edit-modal button[onclick^="setModalPresets"]');
+            buttons.forEach(btn => {
+                const match = btn.getAttribute('onclick').match(/setModalPresets\('([^']*)'/);
+                const btnCode = match ? match[1] : '';
+                if (btnCode === (code || '')) {
+                    btn.classList.add('ring-4', 'ring-white', 'scale-105', 'z-10');
+                } else {
+                    btn.classList.remove('ring-4', 'ring-white', 'scale-105', 'z-10');
+                }
+            });
+        };
+
         window.setModalPresets = function(code, hours) {
             document.getElementById('modal-input-code').value = code;
             document.getElementById('modal-input-hours').value = hours;
+            window.updateModalActivePresetHighlight(code);
         };
 
         window.closeEditModal = function() {
@@ -4072,8 +4089,12 @@ service cloud.firestore {
             window.selectedCalendarDay = d;
             
             // Re-render grid to update active highlights
+            const role = window.currentUserRole;
+            let empName = window.currentEmployeeName;
             const previewSelector = document.getElementById('preview-profile-selector');
-            const empName = previewSelector ? previewSelector.value : window.currentEmployeeName;
+            if ((role === 'admin' || role === 'poverena') && previewSelector && previewSelector.value) {
+                empName = previewSelector.value;
+            }
             
             const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
             const activeEmp = employees.find(e => e.name === empName) || employees[0];
@@ -4204,8 +4225,12 @@ service cloud.firestore {
         };
 
         window.submitCalendarShiftChange = function(d) {
+            const role = window.currentUserRole;
+            let empName = window.currentEmployeeName;
             const previewSelector = document.getElementById('preview-profile-selector');
-            const empName = previewSelector ? previewSelector.value : window.currentEmployeeName;
+            if ((role === 'admin' || role === 'poverena') && previewSelector && previewSelector.value) {
+                empName = previewSelector.value;
+            }
             
             const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
             const activeEmp = employees.find(e => e.name === empName);
@@ -4239,8 +4264,12 @@ service cloud.firestore {
         };
 
         window.executeCalendarCopy = function(sourceDay) {
+            const role = window.currentUserRole;
+            let empName = window.currentEmployeeName;
             const previewSelector = document.getElementById('preview-profile-selector');
-            const empName = previewSelector ? previewSelector.value : window.currentEmployeeName;
+            if ((role === 'admin' || role === 'poverena') && previewSelector && previewSelector.value) {
+                empName = previewSelector.value;
+            }
             
             const employees = [...(window.activeRoster?.topEmployees || []), ...(window.activeRoster?.bottomEmployees || [])];
             const activeEmp = employees.find(e => e.name === empName);
