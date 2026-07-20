@@ -1500,6 +1500,7 @@ service cloud.firestore {
 
             closeEditModal();
             renderRosterUI();
+            window.autoSaveRoster();
         };
 
         window.moveEmployee = function(group, idx, direction) {
@@ -1521,6 +1522,7 @@ service cloud.firestore {
             window.updatePublishUI();
 
             renderRosterUI();
+            window.autoSaveRoster();
         };
 
         // Setup hook functions on global window object so standard button elements can trigger them
@@ -1597,6 +1599,9 @@ service cloud.firestore {
                     
                     window.hasUnsavedChanges = false;
                     window.updatePublishUI();
+                    
+                    // Cache fetched data to localStorage
+                    window.saveRosterLocally();
                 } else {
                     console.log("Mesiac " + monthDocId + " nebol nájdený, načítavajú sa predvolené hodnoty.");
                     loadRosterFallback();
@@ -1610,23 +1615,27 @@ service cloud.firestore {
         };
 
         // Save roster payload to Firestore
-        window.saveRosterToFirestore = async function() {
+        window.saveRosterToFirestore = async function(isSilent = false) {
             if (window.activeMonthIndex < getCurrentRosterMonthIndex()) {
-                alert("Ukladanie zmien v minulých mesiacoch nie je povolené!");
+                if (!isSilent) alert("Ukladanie zmien v minulých mesiacoch nie je povolené!");
                 return;
             }
             if (!window.firebaseConnected || !window.firestoreDb) {
-                alert("Na zapísanie zmien musíte najprv inicializovať pripojenie k Firebase!");
+                if (!isSilent) alert("Na zapísanie zmien musíte najprv inicializovať pripojenie k Firebase!");
                 return;
             }
 
             // Clicking Zverejniť Rozpis automatically publishes the roster
-            window.activeRoster.published = true;
+            if (!isSilent) {
+                window.activeRoster.published = true;
+            }
 
             const monthDocId = `month_2026_${String(window.activeMonthIndex).padStart(2, '0')}`;
             const btnSave = document.getElementById('btn-save-remote');
-            btnSave.disabled = true;
-            btnSave.innerText = "Ukladanie...";
+            if (btnSave && !isSilent) {
+                btnSave.disabled = true;
+                btnSave.innerText = "Ukladanie...";
+            }
 
             try {
                 const rosterRef = doc(window.firestoreDb, "rosters", monthDocId);
@@ -1660,13 +1669,32 @@ service cloud.firestore {
 
                 window.hasUnsavedChanges = false;
                 window.updatePublishUI();
-                alert("Rozpis úspešne uložený a zverejnený!");
+                if (!isSilent) alert("Rozpis úspešne uložený a zverejnený!");
             } catch (e) {
                 console.error(e);
-                alert("Zlyhalo ukladanie do Firestore: " + e.message);
+                if (!isSilent) alert("Zlyhalo ukladanie do Firestore: " + e.message);
             } finally {
-                btnSave.disabled = false;
-                btnSave.innerHTML = `<span class="material-symbols-outlined text-lg">public</span> Zverejniť Rozpis`;
+                if (btnSave && !isSilent) {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = `<span class="material-symbols-outlined text-lg">public</span> Zverejniť Rozpis`;
+                }
+            }
+        };
+
+        window.saveRosterLocally = function() {
+            const key = `roster_2026_${String(window.activeMonthIndex).padStart(2, '0')}`;
+            const payload = {
+                published: window.activeRoster.published,
+                topEmployees: window.activeRoster.topEmployees,
+                bottomEmployees: window.activeRoster.bottomEmployees
+            };
+            localStorage.setItem(key, JSON.stringify(payload));
+        };
+
+        window.autoSaveRoster = function() {
+            window.saveRosterLocally();
+            if (window.firebaseConnected && window.firestoreDb) {
+                window.saveRosterToFirestore(true);
             }
         };
 
@@ -2016,6 +2044,23 @@ service cloud.firestore {
 
         // Fallback simulation when Firebase is offline
         function loadRosterFallback() {
+            // Attempt to load from localStorage first for local persistence
+            const key = `roster_2026_${String(window.activeMonthIndex).padStart(2, '0')}`;
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    window.activeRoster.topEmployees = parsed.topEmployees || [];
+                    window.activeRoster.bottomEmployees = parsed.bottomEmployees || [];
+                    window.activeRoster.published = parsed.published || false;
+                    window.hasUnsavedChanges = false;
+                    window.updatePublishUI();
+                    return;
+                } catch (e) {
+                    console.error("Zlyhalo načítanie lokálneho záložného rozpisu z pamäte: ", e);
+                }
+            }
+
             // Setup default list for top & bottom groups
             // Dec 2025 has pre-established cells, create clean copies
             if (window.activeMonthIndex >= 6) {
@@ -2126,6 +2171,7 @@ service cloud.firestore {
             window.activeRoster.published = !window.activeRoster.published;
             window.hasUnsavedChanges = true;
             window.updatePublishUI();
+            window.autoSaveRoster();
         };
 
         window.onPublishStateChanged = function() {
@@ -2136,6 +2182,7 @@ service cloud.firestore {
             window.activeRoster.published = document.getElementById('month-published-checkbox').checked;
             window.hasUnsavedChanges = true;
             window.updatePublishUI();
+            window.autoSaveRoster();
         };
 
         window.resetRosterToFallback = function() {
@@ -2147,6 +2194,7 @@ service cloud.firestore {
                 loadRosterFallback();
                 window.hasUnsavedChanges = true;
                 renderRosterUI();
+                window.autoSaveRoster();
             }
         };
 
@@ -2476,6 +2524,7 @@ service cloud.firestore {
 
             closeAddEmployeeModal();
             renderRosterUI();
+            window.autoSaveRoster();
         };
 
         // Remove employee
@@ -2491,6 +2540,7 @@ service cloud.firestore {
                 window.hasUnsavedChanges = true;
                 window.updatePublishUI();
                 renderRosterUI();
+                window.autoSaveRoster();
             }
         };
 
@@ -2588,6 +2638,7 @@ service cloud.firestore {
 
             closeEditModal();
             renderRosterUI();
+            window.autoSaveRoster();
         };
 
         function getSlovakMonthName(mIdx) {

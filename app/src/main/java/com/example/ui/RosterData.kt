@@ -10,6 +10,16 @@ import org.json.JSONObject
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.DayOfWeek
+import android.graphics.Bitmap
+import android.util.Base64
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class RosterCell(
     val day: Int,
@@ -399,6 +409,8 @@ object RosterData {
                 decemberTopEmployees
             } else if (m == 6) {
                 getJuneTopEmployees()
+            } else if (m == 7) {
+                getJulyTopEmployees()
             } else {
                 val previousTop = monthlyTopEmployees[m - 1] ?: (if (m == 1) decemberTopEmployees else emptyList())
                 val ym = getYearMonthForIndex(m)
@@ -419,6 +431,8 @@ object RosterData {
                 decemberBottomEmployees
             } else if (m == 6) {
                 getJuneBottomEmployees()
+            } else if (m == 7) {
+                getJulyBottomEmployees()
             } else {
                 val previousBottom = monthlyBottomEmployees[m - 1] ?: (if (m == 1) decemberBottomEmployees else emptyList())
                 val ym = getYearMonthForIndex(m)
@@ -517,6 +531,16 @@ object RosterData {
         }
         val context = appContext
         if (context != null) {
+            val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("july_roster_fixed_v2", false)) {
+                prefs.edit()
+                    .remove("roster_month_7_top_employees")
+                    .remove("roster_month_7_bottom_employees")
+                    .putBoolean("july_roster_fixed_v2", true)
+                    .apply()
+                monthlyTopEmployees.remove(7)
+                monthlyBottomEmployees.remove(7)
+            }
             loadPublishedStates(context)
             for (m in 0..12) {
                 if (!monthlyTopEmployees.containsKey(m)) {
@@ -1332,6 +1356,304 @@ object RosterData {
         )
     }
 
+    fun getJulyTopEmployees(): List<RosterEmployee> {
+        return listOf(
+            createEmployee("PaedDr. Adámik M.", "172,5",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "D", "7,5", 7, "D", "7,5", 8, "D", "7,5", 9, "D", "7,5", 10, "D", "7,5",
+                13, "D", "7,5", 14, "D", "7,5", 15, "D", "7,5", 16, "D", "7,5", 17, "D", "7,5",
+                20, "D", "7,5", 21, "D", "7,5", 22, "D", "7,5", 23, "D", "7,5", 24, "D", "7,5",
+                27, "D", "7,5", 28, "D", "7,5", 29, "D", "7,5", 30, "D", "7,5", 31, "D", "7,5"
+            ),
+            createEmployee("Bc. Kovančík", "172,5",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "D", "7,5", 7, "D", "7,5",
+                8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                13, "P", "7,5", 14, "P", "7,5", 15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5",
+                20, "P", "7,5", 21, "P", "7,5", 22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5",
+                27, "D", "7,5", 28, "D", "7,5", 29, "D", "7,5", 30, "D", "7,5", 31, "D", "7,5"
+            ),
+            createEmployee("Kováčová R.", "172,5",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "P", "7,5", 7, "P", "7,5", 8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                13, "P", "7,5", 14, "P", "7,5", 15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5",
+                20, "P", "7,5", 21, "P", "7,5", 22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5",
+                27, "P", "7,5", 28, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ),
+            createEmployee("Bc. Adámik R.", "176,5",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "P", "7,5", 7, "P", "7,5", 8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                13, "P", "7,5", 14, "P", "7,5", 15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5",
+                20, "SR", "11,5", 21, "P", "7,5", 22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5",
+                27, "P", "7,5", 28, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ),
+            createEmployee("Roštáš A.", "176,5",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "P", "7,5", 7, "P", "7,5", 8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                13, "P", "7,5", 14, "P", "7,5", 15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5",
+                20, "P", "7,5", 21, "P", "7,5", 22, "P", "7,5", 23, "P", "7,5", 24, "SR", "11,5",
+                27, "P", "7,5", 28, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ),
+            createEmployee("Bc. Peťko M.", "173,0",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "P", "7,5", 7, "P", "7,5", 8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                13, "D", "7,5", 14, "D", "7,5", 15, "D", "7,5", 16, "D", "7,5", 17, "D", "7,5",
+                20, "P", "7,5", 21, "P", "7,5", 22, "SR", "11,5", 23, "SN", "11,5",
+                27, "P", "7,5", 28, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ),
+            createEmployee("Bc. Šebelédy", "177,0",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "P", "7,5", 7, "P", "7,5", 8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                11, "SR", "11,5",
+                13, "P", "7,5", 14, "P", "7,5", 15, "P", "7,5", 16, "SN", "11,5",
+                20, "P", "7,5", 21, "P", "7,5", 22, "P", "7,5", 23, "P", "7,5", 24, "SR", "11,5",
+                28, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ),
+            createEmployee("Bc. Töröková", "176,5",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "P", "7,5", 7, "P", "7,5", 8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                11, "SR", "11,5",
+                13, "D", "7,5", 14, "D", "7,5", 15, "D", "7,5", 16, "D", "7,5", 17, "D", "7,5",
+                20, "P", "7,5", 21, "P", "7,5", 22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5",
+                28, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ),
+            createEmployee("Bielik R.", "172,5",
+                3, "SR", "11,5", 4, "SN", "11,5",
+                7, "SR", "11,5", 8, "SN", "11,5",
+                11, "D", "11,5", 12, "D", "11,5",
+                15, "D", "11,5", 16, "D", "11,5",
+                19, "SR", "11,5", 20, "SN", "11,5",
+                23, "D", "11,5", 24, "SN", "11,5",
+                27, "SR", "11,5", 28, "SN", "11,5",
+                31, "SR", "11,5"
+            ),
+            createEmployee("Fábry J.", "172,5",
+                1, "PR", "11,5", 2, "PN", "11,5",
+                5, "N", "11,5", 6, "PN", "11,5",
+                9, "N", "11,5", 10, "PN", "11,5",
+                14, "PR", "11,5", 15, "PN", "11,5",
+                18, "R", "11,5",
+                21, "PR", "11,5", 22, "PN", "11,5",
+                25, "R", "11,5", 26, "PN", "11,5",
+                29, "PR", "11,5", 30, "PN", "11,5"
+            ),
+            createEmployee("Bc. Bariš D.", "172,5",
+                1, "PR", "11,5", 2, "PN", "11,5",
+                6, "PN", "11,5", 7, "D", "11,5",
+                10, "PN", "11,5", 11, "D", "11,5",
+                14, "PR", "11,5", 15, "PN", "11,5",
+                18, "PR", "11,5", 19, "PN", "11,5",
+                22, "PR", "11,5", 23, "PN", "11,5",
+                26, "PR", "11,5", 27, "PN", "11,5",
+                30, "PR", "11,5"
+            ),
+            createEmployee("PhDr. Kabát", "172,5",
+                1, "N", "11,5", 2, "N", "11,5",
+                5, "PR", "11,5", 6, "PN", "11,5",
+                9, "PR", "11,5", 10, "R", "11,5",
+                13, "PR", "11,5", 14, "R", "11,5",
+                17, "N", "11,5",
+                21, "PR", "11,5", 22, "PN", "11,5",
+                25, "R", "11,5", 26, "R", "11,5",
+                29, "PR", "11,5", 30, "PN", "11,5"
+            ),
+            createEmployee("Kazár D.", "172,5",
+                1, "R", "11,5",
+                5, "PR", "11,5", 6, "R", "11,5", 7, "N", "11,5",
+                9, "PR", "11,5", 10, "PN", "11,5",
+                13, "PR", "11,5", 14, "PN", "11,5",
+                17, "R", "11,5", 18, "R", "11,5",
+                21, "D", "11,5", 22, "D", "11,5",
+                25, "D", "11,5", 26, "D", "11,5",
+                29, "D", "11,5"
+            ),
+            createEmployee("Polyák A.", "172,5",
+                1, "CH", "11,5", 2, "CH", "11,5", 3, "CH", "11,5", 4, "CH", "11,5", 5, "CH", "11,5",
+                6, "R", "11,5",
+                9, "N", "11,5",
+                13, "Par", "11,5",
+                20, "PR", "11,5", 21, "PN", "11,5",
+                24, "PR", "11,5", 25, "PN", "11,5",
+                28, "D", "11,5", 29, "D", "11,5",
+                31, "D", "11,5"
+            ),
+            createEmployee("Bc. Petráš A.", "172,5",
+                2, "D", "11,5", 3, "D", "11,5",
+                6, "D", "11,5", 7, "D", "11,5",
+                10, "D", "11,5", 11, "D", "11,5",
+                14, "D", "11,5", 15, "D", "11,5",
+                18, "D", "11,5", 19, "D", "11,5",
+                22, "D", "11,5", 23, "D", "11,5",
+                26, "D", "11,5", 27, "D", "11,5",
+                30, "D", "11,5"
+            ),
+            createEmployee("Bc. Kelo R.", "172,5",
+                1, "SN", "11,5",
+                4, "SR", "11,5", 5, "SN", "11,5",
+                8, "SR", "11,5", 9, "SN", "11,5",
+                12, "SR", "11,5", 13, "SN", "11,5",
+                16, "SR", "11,5", 17, "SN", "11,5",
+                20, "SR", "11,5", 21, "SN", "11,5",
+                24, "D", "11,5", 25, "D", "11,5",
+                28, "SR", "11,5", 29, "SN", "11,5"
+            ),
+            createEmployee("Sautner R.", "172,5",
+                1, "PN", "11,5",
+                3, "PR", "11,5", 4, "PN", "11,5",
+                7, "D", "11,5",
+                11, "PR", "11,5", 12, "PN", "11,5",
+                15, "PR", "11,5", 16, "PN", "11,5",
+                19, "PR", "11,5", 20, "PN", "11,5",
+                23, "PR", "11,5", 24, "PN", "11,5",
+                27, "PR", "11,5", 28, "PN", "11,5",
+                31, "PR", "11,5"
+            ),
+            createEmployee("Andruška Z.", "172,5",
+                3, "PR", "11,5", 4, "PN", "11,5",
+                7, "D", "11,5", 8, "PN", "11,5",
+                11, "PR", "11,5", 12, "PN", "11,5",
+                15, "PR", "11,5", 16, "PN", "11,5",
+                19, "PR", "11,5", 20, "PN", "11,5",
+                23, "PR", "11,5", 24, "PN", "11,5",
+                27, "PR", "11,5", 28, "PN", "11,5",
+                31, "R", "11,5"
+            ),
+            createEmployee("Bc. Masaryk", "172,5",
+                3, "N", "11,5",
+                6, "R", "11,5", 7, "PR", "11,5", 8, "PN", "11,5",
+                11, "R", "11,5", 12, "PN", "11,5",
+                15, "D", "11,5", 16, "D", "11,5",
+                19, "R", "11,5", 20, "R", "11,5",
+                23, "N", "11,5", 24, "N", "11,5",
+                27, "R", "11,5", 28, "N", "11,5",
+                31, "N", "11,5"
+            ),
+            createEmployee("Šovčík M.", "172,5",
+                1, "N", "11,5",
+                3, "R", "11,5", 4, "N", "11,5",
+                7, "PR", "11,5", 8, "PN", "11,5",
+                11, "R", "11,5", 12, "R", "11,5",
+                15, "D", "11,5", 16, "D", "11,5",
+                19, "D", "11,5", 20, "D", "11,5",
+                23, "D", "11,5", 24, "D", "11,5",
+                27, "D", "11,5", 28, "D", "11,5"
+            )
+        )
+    }
+
+    fun getJulyBottomEmployees(): List<RosterEmployee> {
+        return listOf(
+            createEmployee("Bc. Obert L.", "172,5",
+                1, "SR", "11,5", 2, "SN", "11,5",
+                5, "SR", "11,5", 6, "SN", "11,5",
+                9, "SR", "11,5", 10, "SN", "11,5",
+                12, "SR", "11,5", 13, "SN", "11,5",
+                17, "SR", "11,5", 18, "SN", "11,5",
+                21, "SR", "11,5", 22, "SN", "11,5",
+                25, "SR", "11,5",
+                29, "D", "11,5", 30, "D", "11,5"
+            ),
+            createEmployee("Adámik P.", "172,5",
+                1, "PR", "11,5", 2, "PN", "11,5",
+                5, "PR", "11,5", 6, "PN", "11,5",
+                9, "R", "11,5", 10, "N", "11,5",
+                13, "PR", "11,5", 14, "PN", "11,5",
+                17, "N", "11,5",
+                21, "PR", "11,5", 22, "PN", "11,5",
+                25, "R", "11,5",
+                28, "R", "11,5", 29, "N", "11,5",
+                31, "R", "11,5"
+            ),
+            createEmployee("Gacs Š.", "172,5",
+                1, "PR", "11,5", 2, "PN", "11,5",
+                5, "PR", "11,5", 6, "PN", "11,5",
+                9, "R", "11,5", 10, "D", "11,5",
+                13, "D", "11,5", 14, "D", "11,5",
+                17, "D", "11,5",
+                21, "PR", "11,5", 22, "PN", "11,5",
+                25, "PR", "11,5", 26, "R", "11,5",
+                28, "R", "11,5", 29, "N", "11,5"
+            ),
+            createEmployee("Kabát M.", "172,5",
+                3, "PR", "11,5", 4, "PN", "11,5",
+                7, "PR", "11,5", 8, "PN", "11,5",
+                11, "PR", "11,5", 12, "PN", "11,5",
+                15, "PR", "11,5", 16, "PN", "11,5",
+                19, "PR", "11,5", 20, "PN", "11,5",
+                23, "PR", "11,5", 24, "PN", "11,5",
+                27, "PR", "11,5", 28, "PN", "11,5",
+                31, "PR", "11,5"
+            ),
+            createEmployee("Kinčok K.", "172,5",
+                3, "PR", "11,5", 4, "PN", "11,5",
+                7, "PR", "11,5", 8, "PN", "11,5",
+                11, "PR", "11,5", 12, "PN", "11,5",
+                15, "PR", "11,5", 16, "PN", "11,5",
+                19, "PR", "11,5", 20, "PN", "11,5",
+                23, "PR", "11,5", 24, "PN", "11,5",
+                27, "PR", "11,5", 28, "PN", "11,5",
+                31, "PR", "11,5"
+            ),
+            createEmployee("Mgr. Krenčan", "172,5",
+                1, "P", "7,5", 2, "P", "7,5", 3, "P", "7,5",
+                6, "P", "7,5", 7, "P", "7,5", 8, "P", "7,5", 9, "P", "7,5", 10, "P", "7,5",
+                13, "P", "7,5", 14, "P", "7,5", 15, "P", "7,5", 16, "P", "7,5", 17, "P", "7,5",
+                20, "P", "7,5", 21, "P", "7,5", 22, "P", "7,5", 23, "P", "7,5", 24, "P", "7,5",
+                27, "P", "7,5", 28, "P", "7,5", 29, "P", "7,5", 30, "P", "7,5", 31, "P", "7,5"
+            ),
+            createEmployee("Krenčan M.", "172,5",
+                1, "SN", "11,5",
+                4, "SR", "11,5", 5, "SN", "11,5",
+                8, "SR", "11,5", 9, "SN", "11,5",
+                12, "SR", "11,5", 13, "SN", "11,5",
+                16, "SR", "11,5", 17, "SN", "11,5",
+                20, "SR", "11,5", 21, "SN", "11,5",
+                24, "SR", "11,5", 25, "SN", "11,5",
+                28, "SR", "11,5", 29, "SN", "11,5"
+            ),
+            createEmployee("Nemec M.", "172,5",
+                1, "SN", "11,5",
+                4, "SR", "11,5", 5, "SN", "11,5",
+                8, "SR", "11,5", 9, "SN", "11,5",
+                12, "SR", "11,5", 13, "SN", "11,5",
+                16, "SR", "11,5", 17, "SN", "11,5",
+                20, "SR", "11,5", 21, "SN", "11,5",
+                24, "SR", "11,5", 25, "SN", "11,5",
+                28, "SR", "11,5", 29, "SN", "11,5"
+            ),
+            createEmployee("Rieger T.", "172,5",
+                1, "SN", "11,5",
+                4, "SR", "11,5", 5, "SN", "11,5",
+                8, "SR", "11,5", 9, "SN", "11,5",
+                12, "SR", "11,5", 13, "SN", "11,5",
+                16, "SR", "11,5", 17, "SN", "11,5",
+                20, "SR", "11,5", 21, "SN", "11,5",
+                24, "SR", "11,5", 25, "SN", "11,5",
+                28, "SR", "11,5", 29, "SN", "11,5"
+            ),
+            createEmployee("Lukáč Martin", "172,5",
+                1, "SN", "11,5",
+                4, "SR", "11,5", 5, "SN", "11,5",
+                8, "SR", "11,5", 9, "SN", "11,5",
+                12, "SR", "11,5", 13, "SN", "11,5",
+                16, "SR", "11,5", 17, "SN", "11,5",
+                20, "SR", "11,5", 21, "SN", "11,5",
+                24, "SR", "11,5", 25, "SN", "11,5",
+                28, "SR", "11,5", 29, "SN", "11,5"
+            ),
+            createEmployee("Szelényi L.", "172,5",
+                1, "SN", "11,5",
+                4, "SR", "11,5", 5, "SN", "11,5",
+                8, "SR", "11,5", 9, "SN", "11,5",
+                12, "SR", "11,5", 13, "SN", "11,5",
+                16, "SR", "11,5", 17, "SN", "11,5",
+                20, "SR", "11,5", 21, "SN", "11,5",
+                24, "SR", "11,5", 25, "SN", "11,5",
+                28, "SR", "11,5", 29, "SN", "11,5"
+            )
+        )
+    }
+
     private fun createEmployee(name: String, total: String, vararg shifts: Any): RosterEmployee {
         val completeShifts = mutableMapOf<Int, RosterCell>()
         // Pre-populate all 31 days with empty shifts
@@ -1659,6 +1981,270 @@ object RosterData {
                 else -> CellColors(Color(0xFFE2E8F0), Color(0xFF475569))     // default neutral gray
             }
         }
+    }
+
+    suspend fun analyzeAndApplyRosterFromImage(
+        context: android.content.Context,
+        bitmap: Bitmap
+    ): Pair<Int, Int> = withContext(Dispatchers.IO) { // returns Pair(matchedEmployees, updatedShifts)
+        val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
+        val customKey = prefs.getString("custom_gemini_api_key", null)
+        val systemFallbackKey = "AIzaSyCnghqoYJJY1MT6lXgxu2oOMPqpk9vbhh4"
+        val apiKey = when {
+            !customKey.isNullOrEmpty() -> customKey
+            com.example.BuildConfig.GEMINI_API_KEY.isNotEmpty() && com.example.BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY" -> com.example.BuildConfig.GEMINI_API_KEY
+            else -> systemFallbackKey
+        }
+
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            throw Exception("Gemini API kľúč nie je nastavený v aplikácii! Zadajte ho v nastaveniach.")
+        }
+
+        // Convert bitmap to Base64
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+        val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+
+        val activeMonth = activeRosterMonth
+        val ym = getYearMonthForIndex(activeMonth)
+        val daysInMonth = ym.lengthOfMonth()
+        val slovakMonthName = when (activeMonth) {
+            0 -> "December 2025"
+            1 -> "Január 2026"
+            2 -> "Február 2026"
+            3 -> "Marec 2026"
+            4 -> "Apríl 2026"
+            5 -> "Máj 2026"
+            6 -> "Jún 2026"
+            7 -> "Júl 2026"
+            8 -> "August 2026"
+            9 -> "September 2026"
+            10 -> "Október 2026"
+            11 -> "November 2026"
+            12 -> "December 2026"
+            else -> "Aktuálny mesiac"
+        }
+
+        val promptText = """
+            Jsi expert na čítanie a analýzu plánov služieb (rozpisov služieb).
+            Dostal si obrázok rozpisu služieb (smeny).
+            Tvoja úloha je:
+            1. Identifikovať mená všetkých pracovníkov (kolegov/príslušníkov) v tabuľke rozpisu.
+            2. Pre každého pracovníka zistiť jeho plán služieb deň po dni pre mesiac $slovakMonthName (ktorý má $daysInMonth dní).
+            3. Služby musia byť namapované na skratky kódov služieb, ktoré používa naša aplikácia:
+               - "R" (ranná služba - 7,5 hodín)
+               - "N" (nočná služba - 11,5 hodín)
+               - "SR" (služba ranná - 11,5 hodín)
+               - "SN" (služba nočná - 11,5 hodín)
+               - "PR" (pohotovosť ranná - 11,5 hodín)
+               - "PN" (pohotovosť nočná - 11,5 hodín)
+               - "P" (pohotovosť)
+               - "V" (voľno / dovolenka / iné voľno)
+               - "D" (dovolenka)
+               - "CH" (choroba)
+               - "NONE" (žiadna služba)
+            4. Vráť výsledok vo formáte JSON s nasledovnou štruktúrou:
+            {
+              "employees": [
+                {
+                  "name": "Meno zamestnanca (napr. Adámik M. alebo Rieger T.)",
+                  "shifts": [
+                    { "day": 1, "code": "R", "hours": "7,5" },
+                    { "day": 2, "code": "N", "hours": "11,5" }
+                  ]
+                }
+              ]
+            }
+            Dôležité pravidlá:
+            - Vráť IBA čistý JSON bez akýchkoľvek značiek obalenia typu ```json alebo ```.
+            - Deň ("day") musí byť číslo od 1 po $daysInMonth podľa dňa v mesiaci.
+            - Kód služby ("code") musí byť presne jedna zo skratiek, ktoré sme definovali vyššie (napr. "R", "N", "SR", "SN", "PR", "PN", "P", "V", "D", "CH", "NONE"). Ak nie je služba určená alebo je prázdna, nepoužívaj ju alebo použi "NONE".
+            - Hodiny ("hours") pre rannú "R" sú "7,5", pre 12-hodinové smeny (SR, SN, PR, PN, N) sú "11,5", inak prázdne alebo podla rozpisu.
+        """.trimIndent()
+
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build()
+
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+
+        val requestJson = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("text", promptText)
+                        })
+                        put(JSONObject().apply {
+                            put("inlineData", JSONObject().apply {
+                                put("mimeType", "image/jpeg")
+                                put("data", base64Image)
+                            })
+                        })
+                    })
+                })
+            })
+            put("generationConfig", JSONObject().apply {
+                put("responseMimeType", "application/json")
+            })
+        }
+
+        val body = requestJson.toString().toRequestBody(mediaType)
+        val request = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+            .post(body)
+            .build()
+
+        val responseStr = client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val errorMsg = response.body?.string() ?: ""
+                throw Exception("Chyba API (${response.code}): $errorMsg")
+            }
+            response.body?.string() ?: throw Exception("Prazdna odpoved od Gemini")
+        }
+
+        val responseJson = JSONObject(responseStr)
+        val candidates = responseJson.optJSONArray("candidates") ?: throw Exception("Chybná štruktúra odpovede od Gemini (chýbajú candidates)")
+        if (candidates.length() == 0) throw Exception("Gemini nevrátil žiadne výsledky")
+        val contentObj = candidates.getJSONObject(0).getJSONObject("content")
+        val partsArr = contentObj.getJSONArray("parts")
+        if (partsArr.length() == 0) throw Exception("Gemini nevrátil žiadny text")
+        val rawJsonText = partsArr.getJSONObject(0).getString("text")
+
+        val cleanJsonText = rawJsonText.trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+
+        val parsedData = JSONObject(cleanJsonText)
+        val employeesArray = parsedData.optJSONArray("employees") ?: throw Exception("JSON neobsahuje zoznam 'employees'")
+
+        var matchedCount = 0
+        var totalShiftsUpdated = 0
+
+        val currentTop = topEmployees.toMutableList()
+        val currentBottom = bottomEmployees.toMutableList()
+
+        for (i in 0 until employeesArray.length()) {
+            val parsedEmp = employeesArray.getJSONObject(i)
+            val parsedName = parsedEmp.getString("name")
+            val parsedShifts = parsedEmp.optJSONArray("shifts") ?: continue
+
+            // Let's match this employee
+            var isTop = true
+            var targetIndex = -1
+            
+            // Look in topEmployees
+            val cleanParsed = cleanName(parsedName)
+            var bestMatchIndex = currentTop.indexOfFirst { cleanName(it.name) == cleanParsed }
+            if (bestMatchIndex == -1) {
+                // Try contains
+                bestMatchIndex = currentTop.indexOfFirst { 
+                    val cleanExist = cleanName(it.name)
+                    cleanExist.contains(cleanParsed) || cleanParsed.contains(cleanExist)
+                }
+            }
+            if (bestMatchIndex == -1) {
+                // Try fallback parts
+                val parts = cleanParsed.split(" ").filter { it.length > 2 }
+                for (part in parts) {
+                    bestMatchIndex = currentTop.indexOfFirst { cleanName(it.name).contains(part) }
+                    if (bestMatchIndex != -1) break
+                }
+            }
+
+            if (bestMatchIndex != -1) {
+                isTop = true
+                targetIndex = bestMatchIndex
+            } else {
+                // Look in bottomEmployees
+                bestMatchIndex = currentBottom.indexOfFirst { cleanName(it.name) == cleanParsed }
+                if (bestMatchIndex == -1) {
+                    bestMatchIndex = currentBottom.indexOfFirst { 
+                        val cleanExist = cleanName(it.name)
+                        cleanExist.contains(cleanParsed) || cleanParsed.contains(cleanExist)
+                    }
+                }
+                if (bestMatchIndex == -1) {
+                    val parts = cleanParsed.split(" ").filter { it.length > 2 }
+                    for (part in parts) {
+                        bestMatchIndex = currentBottom.indexOfFirst { cleanName(it.name).contains(part) }
+                        if (bestMatchIndex != -1) break
+                    }
+                }
+                if (bestMatchIndex != -1) {
+                    isTop = false
+                    targetIndex = bestMatchIndex
+                }
+            }
+
+            if (targetIndex != -1) {
+                matchedCount++
+                val empToUpdate = if (isTop) currentTop[targetIndex] else currentBottom[targetIndex]
+                val updatedShiftsMap = empToUpdate.shifts.toMutableMap()
+
+                // Default all days to NONE first so we overwrite completely with template
+                for (day in 1..daysInMonth) {
+                    updatedShiftsMap[day] = RosterCell(day, null, null)
+                }
+
+                for (s in 0 until parsedShifts.length()) {
+                    val shiftObj = parsedShifts.getJSONObject(s)
+                    val dayNum = shiftObj.getInt("day")
+                    if (dayNum in 1..daysInMonth) {
+                        val rawCode = shiftObj.getString("code")
+                        val codeVal = if (rawCode == "NONE") null else rawCode
+                        val hrsVal = if (shiftObj.has("hours")) shiftObj.getString("hours") else null
+                        updatedShiftsMap[dayNum] = RosterCell(dayNum, codeVal, hrsVal)
+                        totalShiftsUpdated++
+                    }
+                }
+
+                // Recalculate total hours (e.g. sum of 7,5 or 11,5)
+                var sumHours = 0.0
+                for (cell in updatedShiftsMap.values) {
+                    val hStr = cell.hours?.replace(",", ".")
+                    val hVal = hStr?.toDoubleOrNull() ?: 0.0
+                    sumHours += hVal
+                }
+                val totalHoursStr = String.format(java.util.Locale.US, "%.1f", sumHours).replace(".", ",")
+
+                val updatedEmp = RosterEmployee(empToUpdate.name, totalHoursStr, updatedShiftsMap)
+                if (isTop) {
+                    currentTop[targetIndex] = updatedEmp
+                } else {
+                    currentBottom[targetIndex] = updatedEmp
+                }
+            }
+        }
+
+        if (matchedCount > 0) {
+            // Update the main reactive lists on the main thread
+            withContext(Dispatchers.Main) {
+                topEmployees = currentTop
+                bottomEmployees = currentBottom
+                monthlyTopEmployees[activeMonth] = currentTop
+                monthlyBottomEmployees[activeMonth] = currentBottom
+                saveMonthlyRoster(context, activeMonth)
+            }
+        }
+
+        Pair(matchedCount, totalShiftsUpdated)
+    }
+
+    private fun cleanName(name: String): String {
+        return name.lowercase()
+            .replace("mgr.", "")
+            .replace("bc.", "")
+            .replace("phdr.", "")
+            .replace("ing.", "")
+            .replace("mudr.", "")
+            .replace("judr.", "")
+            .trim()
+            .replace("\\s+".toRegex(), " ")
     }
 }
 

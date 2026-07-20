@@ -174,7 +174,7 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
         val month = date.monthValue
         val monthIndex = when {
             year == 2025 && month == 12 -> 0
-            year == 2026 && month == 1 -> 1
+            year == 2026 && month in 1..12 -> month
             else -> return
         }
         val day = date.dayOfMonth
@@ -321,6 +321,7 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
                         val updated = existing?.copy(shiftType = type, shiftLength = length)
                             ?: ShiftDay(date = dateStr, shiftType = type, shiftLength = length)
                         toInsert.add(updated)
+                        syncToRoster(currentDate, type, length)
                     }
                     currentDate = currentDate.plusDays(1)
                 }
@@ -349,6 +350,7 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
                         toInsert.add(
                             existing.copy(shiftType = "NONE", shiftLength = 8, note = null, reminderText = null, overtimeHours = 0)
                         )
+                        syncToRoster(month.atDay(dayNum), "NONE", 8)
                     }
                 }
                 if (toInsert.isNotEmpty()) {
