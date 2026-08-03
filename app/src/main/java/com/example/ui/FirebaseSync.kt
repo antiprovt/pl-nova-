@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -158,6 +159,25 @@ object FirebaseSync {
         val monthDocId = "month_2026_${String.format("%02d", currentMonth)}"
 
         Log.d(TAG, "Listening to Firebase for $monthDocId")
+
+        // Listen for permissions document changes
+        localDb.collection("settings").document("permissions")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
+                val data = snapshot.data ?: return@addSnapshotListener
+                val grantedList = (data["grantedUsers"] as? List<*>)?.mapNotNull { it?.toString() }
+                val povereneList = (data["povereneOsoby"] as? List<*>)?.mapNotNull { it?.toString() }
+                
+                val prefs = context.getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+                val editor = prefs.edit()
+                if (grantedList != null) {
+                    editor.putStringSet(RosterPermissions.PREF_GRANTED_USERS, grantedList.toSet())
+                }
+                if (povereneList != null) {
+                    editor.putStringSet(RosterPermissions.PREF_POVERENE_OSOBY, povereneList.toSet())
+                }
+                editor.apply()
+            }
 
         activeListener = localDb.collection("rosters").document(monthDocId)
             .addSnapshotListener { snapshot, error ->
@@ -473,6 +493,27 @@ object FirebaseSync {
             .set(payload)
             .addOnSuccessListener {
                 Log.d(TAG, "FCM demand request registered successfully")
+            }
+    }
+
+    fun syncPermissionsToFirestore(prefs: SharedPreferences) {
+        val localDb = db ?: return
+        val granted = prefs.getStringSet(RosterPermissions.PREF_GRANTED_USERS, emptySet()) ?: emptySet()
+        val poverene = prefs.getStringSet(RosterPermissions.PREF_POVERENE_OSOBY, emptySet()) ?: emptySet()
+        
+        val payload = mapOf(
+            "grantedUsers" to granted.toList(),
+            "povereneOsoby" to poverene.toList(),
+            "updatedAt" to java.time.Instant.now().toString()
+        )
+        
+        localDb.collection("settings").document("permissions")
+            .set(payload, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                Log.d(TAG, "Permissions synced to Firestore")
+            }
+            .addOnFailureListener {
+                Log.e(TAG, "Failed to sync permissions to Firestore", it)
             }
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -66,8 +67,50 @@ fun RosterScreen(modifier: Modifier = Modifier) {
     val loggedInUser = remember { prefs.getString("logged_in_user_name", "") ?: "" }
     val canEdit = remember(loggedInUser) {
         val u = loggedInUser.trim().lowercase()
-        u == "admin" || u == "riegert" || u == "rieger t."
+        u == "admin" || u == "riegert" || u == "rieger t." || com.example.ui.RosterPermissions.isAdminOrPoverena(loggedInUser, prefs)
     }
+    val hasRosterAccess = remember(loggedInUser) {
+        com.example.ui.RosterPermissions.hasRosterViewAccess(loggedInUser, prefs)
+    }
+
+    if (!hasRosterAccess) {
+        Box(
+            modifier = modifier.fillMaxSize().padding(24.dp),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "Prístup k celkovému rozpisu je obmedzený",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Text(
+                        text = "Nemáte udelené oprávnenie na zobrazenie celkového rozpisu. Pre získanie prístupu kontaktujte administrátora alebo poverenú osobu.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+        return
+    }
+
     val canEditThisMonth = remember(canEdit, RosterData.activeRosterMonth) {
         canEdit && (RosterData.activeRosterMonth >= RosterData.getCurrentMonthIndex())
     }

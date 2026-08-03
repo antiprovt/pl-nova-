@@ -360,6 +360,25 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
     var userName by remember { mutableStateOf(prefs.getString("user_name", "") ?: "") }
+    var showPermissionsDialog by remember { mutableStateOf(false) }
+
+    val loggedInUser = remember { prefs.getString("logged_in_user_name", "") ?: "" }
+    val activeUserName = if (loggedInUser.isNotBlank()) loggedInUser else userName
+
+    var hasRosterAccess by remember(activeUserName) {
+        mutableStateOf(com.example.ui.RosterPermissions.hasRosterViewAccess(activeUserName, prefs))
+    }
+
+    LaunchedEffect(activeUserName, showRosterSettingsDialog, showSettingsDialog, showPermissionsDialog) {
+        hasRosterAccess = com.example.ui.RosterPermissions.hasRosterViewAccess(activeUserName, prefs)
+    }
+
+    LaunchedEffect(currentView, hasRosterAccess) {
+        if (currentView == "rozpis" && !hasRosterAccess) {
+            viewModel.setCurrentView("shichter")
+        }
+    }
+
     var tariffSalary by remember { mutableStateOf(prefs.getFloat("tariff_salary", 936.50f)) }
     var personalAllowance by remember { mutableStateOf(prefs.getFloat("personal_allowance", 380.0f)) }
     var shiftAllowance by remember { mutableStateOf(prefs.getFloat("shift_allowance", 40.0f)) }
@@ -652,18 +671,20 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
                 )
                 
-                NavigationDrawerItem(
-                    label = { Text("Celkový rozpis (Rozpis)", fontWeight = FontWeight.Bold) },
-                    selected = currentView == "rozpis",
-                    onClick = {
-                        coroutineScope.launch {
-                            viewModel.setCurrentView("rozpis")
-                            drawerState.close()
-                        }
-                    },
-                    icon = { Icon(Icons.Default.List, contentDescription = null) },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
-                )
+                if (hasRosterAccess) {
+                    NavigationDrawerItem(
+                        label = { Text("Celkový rozpis (Rozpis)", fontWeight = FontWeight.Bold) },
+                        selected = currentView == "rozpis",
+                        onClick = {
+                            coroutineScope.launch {
+                                viewModel.setCurrentView("rozpis")
+                                drawerState.close()
+                            }
+                        },
+                        icon = { Icon(Icons.Default.List, contentDescription = null) },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                    )
+                }
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
@@ -1154,6 +1175,10 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 mealAllowance = valAllowance
                 prefs.edit().putFloat("meal_allowance", valAllowance).apply()
             },
+            onShowPermissions = {
+                showPermissionsDialog = true
+                showSettingsDialog = false
+            },
             onDismiss = { showSettingsDialog = false }
         )
     }
@@ -1172,6 +1197,10 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 showManageMessagesDialog = true
                 showRosterSettingsDialog = false
             },
+            onShowPermissions = {
+                showPermissionsDialog = true
+                showRosterSettingsDialog = false
+            },
             onToggleNotifications = { enabled ->
                 isRosterNotificationsEnabled = enabled
                 prefs.edit().putBoolean("roster_notifications_enabled", enabled).apply()
@@ -1186,6 +1215,13 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 showRosterSettingsDialog = false
             },
             onDismiss = { showRosterSettingsDialog = false }
+        )
+    }
+
+    // Permissions Management Dialog
+    if (showPermissionsDialog) {
+        com.example.ui.PermissionsManagementDialog(
+            onDismiss = { showPermissionsDialog = false }
         )
     }
 
@@ -1724,6 +1760,7 @@ fun SettingsDialog(
     onPersonalAllowanceChange: (Float) -> Unit,
     onShiftAllowanceChange: (Float) -> Unit,
     onMealAllowanceChange: (Float) -> Unit,
+    onShowPermissions: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var isFinancialSettingsExpanded by remember { mutableStateOf(false) }
@@ -2195,6 +2232,44 @@ fun SettingsDialog(
                     }
                 }
 
+                val context = LocalContext.current
+                val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
+                if (com.example.ui.RosterPermissions.isAdminOrPoverena(userName, prefs)) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onShowPermissions?.invoke()
+                                onDismiss()
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Oprávnenia pre rozpis",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Správa prístupu príslušníkov k možnosti zobrazenia celkového rozpisu.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Oprávnenia",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
                 if (userName.trim().equals("admin", ignoreCase = true)) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     
@@ -2256,6 +2331,7 @@ fun RosterSettingsDialog(
     userName: String,
     onShowFirebaseSync: () -> Unit,
     onShowManageMessages: () -> Unit,
+    onShowPermissions: () -> Unit = {},
     onToggleNotifications: (Boolean) -> Unit,
     onToggleTheme: (String) -> Unit,
     onLogout: () -> Unit = {},
@@ -2273,6 +2349,7 @@ fun RosterSettingsDialog(
     var isAnalyzing by remember { mutableStateOf(false) }
     var analysisResult by remember { mutableStateOf<String?>(null) }
     var analysisError by remember { mutableStateOf<String?>(null) }
+    var pendingRosterPreview by remember { mutableStateOf<com.example.ui.ParsedRosterPreview?>(null) }
 
     val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
@@ -2280,6 +2357,34 @@ fun RosterSettingsDialog(
         selectedImageUri = uri
         analysisResult = null
         analysisError = null
+        if (uri != null) {
+            coroutineScope.launch {
+                isAnalyzing = true
+                try {
+                    val bitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+                        android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                            decoder.isMutableRequired = true
+                        }
+                    } else {
+                        @Suppress("DEPRECATION")
+                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    }
+                    if (bitmap != null) {
+                        val preview = com.example.ui.RosterData.analyzeRosterFromImage(context, bitmap)
+                        pendingRosterPreview = preview
+                        analysisResult = "Analýza dokončená! Zistených ${preview.totalDetectedInImage} osôb (${preview.matchedCount} spárovaných). Prosím, skontrolujte a schváľte rozpis v zobrazenom náhľade."
+                    } else {
+                        analysisError = "Nepodarilo sa načítať vybraný obrázok."
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    analysisError = e.message ?: "Neznáma chyba pri analýze."
+                } finally {
+                    isAnalyzing = false
+                }
+            }
+        }
     }
 
     val selectedBitmap = remember(selectedImageUri) {
@@ -2552,6 +2657,42 @@ fun RosterSettingsDialog(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
+                // Permissions management section for Admin / Poverená osoba
+                if (com.example.ui.RosterPermissions.isAdminOrPoverena(userName, prefs)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onShowPermissions()
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Oprávnenia pre celkový rozpis",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Správa prístupu príslušníkov k možnosti zobrazenia celkového rozpisu.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Oprávnenia",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+
                 // Odhlásenie Section (Logout Row)
                 Row(
                     modifier = Modifier
@@ -2660,18 +2801,19 @@ fun RosterSettingsDialog(
                                 OutlinedTextField(
                                     value = customGeminiApiKey,
                                     onValueChange = { newValue ->
-                                        customGeminiApiKey = newValue
-                                        prefs.edit().putString("custom_gemini_api_key", newValue).apply()
+                                        val trimmedValue = newValue.trim()
+                                        customGeminiApiKey = newValue // Keep what they type so they can edit it, but we'll save the trimmed version or trim when using.
+                                        prefs.edit().putString("custom_gemini_api_key", trimmedValue).apply()
                                     },
                                     label = { Text("Vložte Gemini API kľúč") },
-                                    placeholder = { Text("AIzaSy...") },
+                                    placeholder = { Text("AIzaSy... alebo AQ...") },
                                     modifier = Modifier.fillMaxWidth().testTag("custom_gemini_api_key_input"),
                                     singleLine = true,
                                     textStyle = MaterialTheme.typography.bodyMedium,
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 Text(
-                                    text = "Ak predvolený kľúč nefunguje (napr. bol zablokovaný alebo vyčerpal limit), vložte sem svoj vlastný bezplatný API kľúč z Google AI Studio.",
+                                    text = "Podporované sú všetky formáty kľúčov (napr. začínajúce na AIzaSy... alebo AQ...). Pred uložením kľúč automaticky očistíme od prípadných medzier.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2818,8 +2960,9 @@ fun RosterSettingsDialog(
                                             analysisResult = null
                                             analysisError = null
                                             try {
-                                                val res = com.example.ui.RosterData.analyzeAndApplyRosterFromImage(context, selectedBitmap)
-                                                analysisResult = "Úspešne zanalyzované! Spárovaných ${res.first} príslušníkov a aktualizovaných ${res.second} služieb."
+                                                val preview = com.example.ui.RosterData.analyzeRosterFromImage(context, selectedBitmap)
+                                                pendingRosterPreview = preview
+                                                analysisResult = "Analýza dokončená! Zistených ${preview.totalDetectedInImage} osôb (${preview.matchedCount} spárovaných). Prosím, skontrolujte a schváľte rozpis v zobrazenom náhľade."
                                             } catch (e: java.lang.Exception) {
                                                 e.printStackTrace()
                                                 analysisError = e.message ?: "Neznáma chyba pri analýze."
@@ -2925,6 +3068,301 @@ fun RosterSettingsDialog(
                         modifier = Modifier.testTag("roster_settings_close_btn")
                     ) {
                         Text("Zavrieť", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+
+    pendingRosterPreview?.let { preview ->
+        RosterPreviewApprovalDialog(
+            preview = preview,
+            onApprove = {
+                coroutineScope.launch {
+                    try {
+                        com.example.ui.RosterData.applyParsedRoster(context, preview)
+                        analysisResult = "✓ Rozpis pre ${preview.monthName} bol schválený a úspešne zapísaný do aplikácie!"
+                        analysisError = null
+                    } catch (e: Exception) {
+                        analysisError = "Chyba pri ukladaní schváleného rozpisu: ${e.message}"
+                    } finally {
+                        pendingRosterPreview = null
+                    }
+                }
+            },
+            onDismiss = {
+                pendingRosterPreview = null
+                analysisResult = "Analýza bola zrušená. Pôvodný rozpis zostal bez zmien."
+            }
+        )
+    }
+}
+
+@Composable
+fun RosterPreviewApprovalDialog(
+    preview: com.example.ui.ParsedRosterPreview,
+    onApprove: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .testTag("roster_preview_dialog"),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(18.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF15803D),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "Náhľad zanalyzovaného rozpisu",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = preview.monthName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Summary Stats Card
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Spárovaní príslušníci:",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "${preview.matchedCount} / ${preview.totalDetectedInImage}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Celkovo zistených služieb:",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "${preview.totalShiftsUpdated}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                // Safety Warning Banner
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFEF3C7),
+                    border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFB45309),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Pôvodný rozpis sa nezmenil. Prečítajte si zistené služby a schváľte ich stlačením tlačidla nižšie.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF78350F),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Zoznam zistených príslušníkov a služieb:",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                // List of Detected Employees
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    preview.employeePreviews.forEach { empPreview ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (empPreview.matchedName != null) {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                                }
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                if (empPreview.matchedName != null) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = empPreview.detectedName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (empPreview.matchedName != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color(0xFFDCFCE7)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF14532D),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Text(
+                                                    text = "Spárované: ${empPreview.matchedName}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color(0xFF14532D),
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.errorContainer
+                                        ) {
+                                            Text(
+                                                text = "Nespárované",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = "Služby (${empPreview.shiftCount}): ${empPreview.shiftsSummary}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                if (empPreview.dailyShiftsPreview.isNotEmpty()) {
+                                    Text(
+                                        text = empPreview.dailyShiftsPreview.take(15).joinToString(" | ") { "${it.first}. ${it.second}" } +
+                                                if (empPreview.dailyShiftsPreview.size > 15) " ..." else "",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 2
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Action Buttons
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onApprove,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("approve_roster_preview_btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF15803D))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Schváliť a zapísať rozpis",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("cancel_roster_preview_btn"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Zrušiť (Nepoužiť rozpis)")
                     }
                 }
             }
@@ -4071,15 +4509,14 @@ fun MonthStatisticsView(
                 }
             }
 
-            // Calculate Vacation Pay (single-day)
-            var computedVacationPay = 0.0
-            for (i in 1..singleDayVacationCount) {
-                computedVacationPay += if (i <= 3) {
-                    dailyPnBasis * 0.25
-                } else {
-                    dailyPnBasis * 0.55
-                }
-            }
+            // Calculate Vacation Pay (D - Dovolenka: 96.83 € / deň)
+            val computedVacationPay = vacationCount * 96.83
+
+            // Calculate KZ Pay (KZ - Kondičné zariadenie / Kĺzavé voľno: 193.79 € za 2 dni, t.j. 96.895 € / deň)
+            val computedKzPay = kzCount * (193.79 / 2.0)
+
+            // Calculate Paragraf Pay (P / Par - Návšteva lekára: 96.83 € / deň)
+            val computedParPay = parCount * 96.83
 
             val fundOfHours = run {
                 val isDec2025 = (selectedMonth.year == 2025 && selectedMonth.monthValue == 12)
@@ -4126,7 +4563,7 @@ fun MonthStatisticsView(
             val isWholeMonthSickOrVacation = (sickCount == daysInMonthSum) || (vacationCount == daysInMonthSum) || ((sickCount + vacationCount) == daysInMonthSum)
             val mvAllowance = if (workedShiftsForMeal >= 2 && !isWholeMonthSickOrVacation) 20.0 else 0.0
             val computedMealAllowance = workedShiftsForMeal * 4.34
-            val totalWageEstimate = computedBasicWage + computedOvertimeSurcharge + computedNightSurcharge + computedSaturdaySurcharge + computedSundaySurcharge + computedHolidaySurcharge + computedPnPay + computedVacationPay + personalAllowanceVal + shiftAllowanceVal + mvAllowance + computedMealAllowance
+            val totalWageEstimate = computedBasicWage + computedOvertimeSurcharge + computedNightSurcharge + computedSaturdaySurcharge + computedSundaySurcharge + computedHolidaySurcharge + computedPnPay + computedVacationPay + computedKzPay + computedParPay + personalAllowanceVal + shiftAllowanceVal + mvAllowance + computedMealAllowance
 
             // Net salary computation according to Slovak legislation (2026 guidelines)
             // Note: Príplatok iné (shiftAllowanceVal) is exempt from taxes/insurance according to laws
@@ -4356,13 +4793,33 @@ fun MonthStatisticsView(
                                 )
                             }
 
-                            // Dovolenka details (single day)
-                            if (computedVacationPay > 0.0) {
-                                val slovakVacDays = if (singleDayVacationCount == 1) "1 deň" else if (singleDayVacationCount < 5) "$singleDayVacationCount dni" else "$singleDayVacationCount dní"
+                            // Dovolenka details (D)
+                            if (vacationCount > 0) {
+                                val slovakVacDays = if (vacationCount == 1) "1 deň" else if (vacationCount < 5) "$vacationCount dni" else "$vacationCount dní"
                                 SalaryDetailRow(
-                                    title = "Náhrada za dovolenku (1-dňová)",
-                                    subtitle = "1.-3. deň 25%, od 4. dňa 55% z $dailyPnBasisFormatted €/deň | $slovakVacDays",
+                                    title = "Náhrada za dovolenku (D)",
+                                    subtitle = "Sadzba 96,83 € / deň | $slovakVacDays",
                                     value = computedVacationPay
+                                )
+                            }
+
+                            // Paragraf details (P)
+                            if (parCount > 0) {
+                                val slovakParDays = if (parCount == 1) "1 deň" else if (parCount < 5) "$parCount dni" else "$parCount dní"
+                                SalaryDetailRow(
+                                    title = "Náhrada za Paragraf (P - návšteva lekára)",
+                                    subtitle = "Sadzba 96,83 € / deň | $slovakParDays",
+                                    value = computedParPay
+                                )
+                            }
+
+                            // KZ details (KZ)
+                            if (kzCount > 0) {
+                                val slovakKzDays = if (kzCount == 1) "1 deň" else if (kzCount < 5) "$kzCount dni" else "$kzCount dní"
+                                SalaryDetailRow(
+                                    title = "Náhrada za KZ (spravidla 2 dni po sebe = 193,79 €)",
+                                    subtitle = "Sadzba 193,79 € / 2 dni (96,90 €/deň) | $slovakKzDays",
+                                    value = computedKzPay
                                 )
                             }
 
@@ -4641,152 +5098,7 @@ fun MonthStatisticsView(
             }
         }
 
-        // TILE 4: SHIFT DISTRIBUTION VERTICAL CHART (F3EDF7 Light Lavender tile)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF3EDF7)
-                ),
-                shape = RoundedCornerShape(24.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "DISTRIBÚCIA SMIEN",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF49454F),
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "Detailný graf",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Compute clean vertical representation bars
-                    val maxCount = maxOf(
-                        1,
-                        morningCount,
-                        nightCount,
-                        overtimeCount,
-                        vacationCount,
-                        sickCount,
-                        meetingCount,
-                        trainingCount,
-                        noneCount
-                    ).toFloat()
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        // Ranná
-                        val mornPct = (morningCount / maxCount)
-                        BentoBarColumn(
-                            title = "Ranná",
-                            count = morningCount,
-                            pct = mornPct,
-                            color = ShiftColorScheme.MorningBackground,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // Nočná
-                        val nightPct = (nightCount / maxCount)
-                        BentoBarColumn(
-                            title = "Nočná",
-                            count = nightCount,
-                            pct = nightPct,
-                            color = ShiftColorScheme.NightBackground,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // Nadčas
-                        val otPct = (overtimeCount / maxCount)
-                        BentoBarColumn(
-                            title = "Nadčas",
-                            count = overtimeCount,
-                            pct = otPct,
-                            color = ShiftColorScheme.OvertimeBackground,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // Porada
-                        val mtPct = (meetingCount / maxCount)
-                        BentoBarColumn(
-                            title = "Porada",
-                            count = meetingCount,
-                            pct = mtPct,
-                            color = ShiftColorScheme.MeetingBackground,
-                            stripeColor = ShiftColorScheme.getStripeColorForType("MEETING"),
-                            modifier = Modifier.weight(1f)
-                        )
-                        // Výcvik
-                        val trPct = (trainingCount / maxCount)
-                        BentoBarColumn(
-                            title = "Výcvik",
-                            count = trainingCount,
-                            pct = trPct,
-                            color = ShiftColorScheme.TrainingBackground,
-                            stripeColor = ShiftColorScheme.getStripeColorForType("TRAINING"),
-                            modifier = Modifier.weight(1f)
-                        )
-                        // Dovolenka
-                        val vacPct = (vacationCount / maxCount)
-                        BentoBarColumn(
-                            title = "Dovol.",
-                            count = vacationCount,
-                            pct = vacPct,
-                            color = ShiftColorScheme.VacationBackground,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // CH
-                        val sickPct = (sickCount / maxCount)
-                        BentoBarColumn(
-                            title = "CH",
-                            count = sickCount,
-                            pct = sickPct,
-                            color = ShiftColorScheme.SickBackground,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // Voľno
-                        val nonePct = (noneCount / maxCount)
-                        BentoBarColumn(
-                            title = "Voľno",
-                            count = noneCount,
-                            pct = nonePct,
-                            color = ShiftColorScheme.NoneBackground,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Dynamic legend list
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LegendRow(name = "Ranná zmena (R / PR)", count = morningCount, color = ShiftColorScheme.MorningBackground, isDuty = false)
-                        LegendRow(name = "Nočná zmena (N / PN)", count = nightCount, color = ShiftColorScheme.NightBackground, isDuty = false)
-                        LegendRow(name = "Nadčas (NČ)", count = overtimeCount, color = ShiftColorScheme.OvertimeBackground, isDuty = false)
-                        LegendRow(name = "Porada (P)", count = meetingCount, color = ShiftColorScheme.MeetingBackground, isDuty = false)
-                        LegendRow(name = "Výcvik (V)", count = trainingCount, color = ShiftColorScheme.TrainingBackground, isDuty = false)
-                        LegendRow(name = "Dovolenka", count = vacationCount, color = ShiftColorScheme.VacationBackground, isDuty = false)
-                        LegendRow(name = "Choroba (CH)", count = sickCount, color = ShiftColorScheme.SickBackground, isDuty = false)
-                        LegendRow(name = "Dohoda (KZ)", count = kzCount, color = ShiftColorScheme.getColorsForType("KZ").second, isDuty = false)
-                        LegendRow(name = "Paragraf (Par)", count = parCount, color = ShiftColorScheme.getColorsForType("Par").second, isDuty = false)
-                        LegendRow(name = "Voľné dni", count = noneCount, color = ShiftColorScheme.NoneBackground, isDuty = false)
-                    }
-                }
-            }
-        }
 
 
 
@@ -4894,23 +5206,20 @@ fun MonthOverviewView(
         }
     }
 
-    if (shiftDay.shiftType == "VACATION" && !isMultiDayVacation) {
-        val sSortedVacationDays = shiftDays.filter { 
-            try {
-                val d = LocalDate.parse(it.date)
-                it.shiftType == "VACATION" && d.year == targetDate.year && d.month == targetDate.month
-            } catch(e: Exception) { false }
-        }.sortedBy { it.date }
-        val idx = sSortedVacationDays.indexOfFirst { it.date == shiftDay.date }
-        val vacationIndex = if (idx >= 0) idx + 1 else 1
-        dailyVacationPay = if (vacationIndex <= 3) {
-            dailyPnBasis * 0.25
-        } else {
-            dailyPnBasis * 0.55
-        }
+    var dailyKzPay = 0.0
+    var dailyParPay = 0.0
+
+    if (shiftDay.shiftType == "VACATION") {
+        dailyVacationPay = 96.83
+    }
+    if (shiftDay.shiftType == "Par") {
+        dailyParPay = 96.83
+    }
+    if (shiftDay.shiftType == "KZ") {
+        dailyKzPay = 193.79 / 2.0
     }
 
-    val dailyTotalEstimate = dailyBasicWage + dailyOvertimeWage + dailyNightPay + dailyWeekendPay + dailyHolidayPay + dailyPnPay + dailyVacationPay
+    val dailyTotalEstimate = dailyBasicWage + dailyOvertimeWage + dailyNightPay + dailyWeekendPay + dailyHolidayPay + dailyPnPay + dailyVacationPay + dailyKzPay + dailyParPay
 
     LazyColumn(
         state = listState,

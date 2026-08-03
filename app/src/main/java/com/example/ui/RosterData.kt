@@ -1983,26 +1983,40 @@ object RosterData {
         }
     }
 
-    suspend fun analyzeAndApplyRosterFromImage(
+    suspend fun analyzeRosterFromImage(
         context: android.content.Context,
         bitmap: Bitmap
-    ): Pair<Int, Int> = withContext(Dispatchers.IO) { // returns Pair(matchedEmployees, updatedShifts)
+    ): ParsedRosterPreview = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
-        val customKey = prefs.getString("custom_gemini_api_key", null)
-        val systemFallbackKey = "AIzaSyCnghqoYJJY1MT6lXgxu2oOMPqpk9vbhh4"
+        val customKey = prefs.getString("custom_gemini_api_key", null)?.trim()
+        val configKey = com.example.BuildConfig.GEMINI_API_KEY.trim()
         val apiKey = when {
             !customKey.isNullOrEmpty() -> customKey
-            com.example.BuildConfig.GEMINI_API_KEY.isNotEmpty() && com.example.BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY" -> com.example.BuildConfig.GEMINI_API_KEY
-            else -> systemFallbackKey
+            configKey.isNotEmpty() && configKey != "MY_GEMINI_API_KEY" -> configKey
+            else -> ""
         }
 
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
-            throw Exception("Gemini API kľúč nie je nastavený v aplikácii! Zadajte ho v nastaveniach.")
+            throw Exception("Gemini API kľúč nie je nastavený! Vygenerujte si vlastný bezplatný kľúč v Google AI Studio a vložte ho do poľa nižšie.")
+        }
+
+        // Resize bitmap if too large to ensure fast upload and processing
+        val maxDimension = 1200
+        val resizedBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
+            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+            val (newWidth, newHeight) = if (ratio > 1) {
+                Pair(maxDimension, (maxDimension / ratio).toInt())
+            } else {
+                Pair((maxDimension * ratio).toInt(), maxDimension)
+            }
+            Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+        } else {
+            bitmap
         }
 
         // Convert bitmap to Base64
         val outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
         val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
 
         val activeMonth = activeRosterMonth
@@ -2057,7 +2071,7 @@ object RosterData {
             }
             Dôležité pravidlá:
             - Vráť IBA čistý JSON bez akýchkoľvek značiek obalenia typu ```json alebo ```.
-            - Deň ("day") musí byť číslo od 1 po $daysInMonth podľa dňa v mesiaci.
+            - Deň ("day") must be a number from 1 to $daysInMonth according to the day of the month.
             - Kód služby ("code") musí byť presne jedna zo skratiek, ktoré sme definovali vyššie (napr. "R", "N", "SR", "SN", "PR", "PN", "P", "V", "D", "CH", "NONE"). Ak nie je služba určená alebo je prázdna, nepoužívaj ju alebo použi "NONE".
             - Hodiny ("hours") pre rannú "R" sú "7,5", pre 12-hodinové smeny (SR, SN, PR, PN, N) sú "11,5", inak prázdne alebo podla rozpisu.
         """.trimIndent()
@@ -2070,39 +2084,99 @@ object RosterData {
 
         val mediaType = "application/json; charset=utf-8".toMediaType()
 
-        val requestJson = JSONObject().apply {
-            put("contents", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("parts", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("text", promptText)
-                        })
-                        put(JSONObject().apply {
-                            put("inlineData", JSONObject().apply {
-                                put("mimeType", "image/jpeg")
-                                put("data", base64Image)
+        var responseStr = ""
+        var success = false
+        var lastErrorMsg = ""
+
+        val combinations = listOf(
+            Triple("gemini-3.5-flash", "v1beta", true),
+            Triple("gemini-flash-latest", "v1beta", true),
+            Triple("gemini-2.5-flash", "v1beta", true),
+            Triple("gemini-3.5-flash", "v1beta", false),
+            Triple("gemini-flash-latest", "v1beta", false),
+            Triple("gemini-2.5-flash", "v1beta", false)
+        )
+
+        for ((model, apiVersion, useConfig) in combinations) {
+            if (success) break
+
+            var attempt = 1
+            val maxAttempts = 3
+            var delayMs = 1000L
+
+            while (attempt <= maxAttempts && !success) {
+                try {
+                    val requestJson = JSONObject().apply {
+                        put("contents", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("parts", JSONArray().apply {
+                                    put(JSONObject().apply {
+                                        put("text", promptText)
+                                    })
+                                    put(JSONObject().apply {
+                                        put("inlineData", JSONObject().apply {
+                                            put("mimeType", "image/jpeg")
+                                            put("data", base64Image)
+                                        })
+                                    })
+                                })
                             })
                         })
-                    })
-                })
-            })
-            put("generationConfig", JSONObject().apply {
-                put("responseMimeType", "application/json")
-            })
+                        if (useConfig) {
+                            put("generationConfig", JSONObject().apply {
+                                put("responseMimeType", "application/json")
+                            })
+                        }
+                    }
+
+                    val body = requestJson.toString().toRequestBody(mediaType)
+                    val urlStr = "https://generativelanguage.googleapis.com/$apiVersion/models/$model:generateContent?key=$apiKey"
+                    val request = Request.Builder()
+                        .url(urlStr)
+                        .post(body)
+                        .build()
+
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            responseStr = response.body?.string() ?: throw Exception("Prázdna odpoveď od Gemini")
+                            success = true
+                        } else {
+                            val errorBody = response.body?.string() ?: ""
+                            lastErrorMsg = "Chyba API v $apiVersion/$model (useConfig=$useConfig) (${response.code}): $errorBody"
+                            
+                            if (response.code == 404 || response.code == 400 || response.code == 403) {
+                                attempt = maxAttempts + 1
+                            } else {
+                                if (attempt < maxAttempts) {
+                                    Thread.sleep(delayMs)
+                                    delayMs *= 2
+                                    attempt++
+                                } else {
+                                    attempt++
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    lastErrorMsg = "Výnimka pre $apiVersion/$model (useConfig=$useConfig): ${e.message ?: e.toString()}"
+                    val isRetryable = e is java.io.IOException || e.message?.contains("503") == true || e.message?.contains("429") == true
+                    if (!isRetryable) {
+                        attempt = maxAttempts + 1
+                    } else {
+                        if (attempt < maxAttempts) {
+                            Thread.sleep(delayMs)
+                            delayMs *= 2
+                            attempt++
+                        } else {
+                            attempt++
+                        }
+                    }
+                }
+            }
         }
 
-        val body = requestJson.toString().toRequestBody(mediaType)
-        val request = Request.Builder()
-            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
-            .post(body)
-            .build()
-
-        val responseStr = client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                val errorMsg = response.body?.string() ?: ""
-                throw Exception("Chyba API (${response.code}): $errorMsg")
-            }
-            response.body?.string() ?: throw Exception("Prazdna odpoved od Gemini")
+        if (!success) {
+            throw Exception("Nepodarilo sa úspešne spojiť s Gemini API. Vyskúšali sme modely gemini-3.5-flash a gemini-flash-latest.\nPosledná chyba: $lastErrorMsg")
         }
 
         val responseJson = JSONObject(responseStr)
@@ -2113,11 +2187,12 @@ object RosterData {
         if (partsArr.length() == 0) throw Exception("Gemini nevrátil žiadny text")
         val rawJsonText = partsArr.getJSONObject(0).getString("text")
 
-        val cleanJsonText = rawJsonText.trim()
-            .removePrefix("```json")
-            .removePrefix("```")
-            .removeSuffix("```")
-            .trim()
+        val startIndex = rawJsonText.indexOf('{')
+        val endIndex = rawJsonText.lastIndexOf('}')
+        if (startIndex == -1 || endIndex == -1 || endIndex < startIndex) {
+            throw Exception("Chyba: Gemini nevrátil platný JSON objekt. Surová odpoveď:\n$rawJsonText")
+        }
+        val cleanJsonText = rawJsonText.substring(startIndex, endIndex + 1)
 
         val parsedData = JSONObject(cleanJsonText)
         val employeesArray = parsedData.optJSONArray("employees") ?: throw Exception("JSON neobsahuje zoznam 'employees'")
@@ -2127,28 +2202,25 @@ object RosterData {
 
         val currentTop = topEmployees.toMutableList()
         val currentBottom = bottomEmployees.toMutableList()
+        val previewsList = mutableListOf<EmployeeShiftPreview>()
 
         for (i in 0 until employeesArray.length()) {
             val parsedEmp = employeesArray.getJSONObject(i)
             val parsedName = parsedEmp.getString("name")
-            val parsedShifts = parsedEmp.optJSONArray("shifts") ?: continue
+            val parsedShifts = parsedEmp.optJSONArray("shifts") ?: JSONArray()
 
-            // Let's match this employee
             var isTop = true
             var targetIndex = -1
             
-            // Look in topEmployees
             val cleanParsed = cleanName(parsedName)
             var bestMatchIndex = currentTop.indexOfFirst { cleanName(it.name) == cleanParsed }
             if (bestMatchIndex == -1) {
-                // Try contains
                 bestMatchIndex = currentTop.indexOfFirst { 
                     val cleanExist = cleanName(it.name)
                     cleanExist.contains(cleanParsed) || cleanParsed.contains(cleanExist)
                 }
             }
             if (bestMatchIndex == -1) {
-                // Try fallback parts
                 val parts = cleanParsed.split(" ").filter { it.length > 2 }
                 for (part in parts) {
                     bestMatchIndex = currentTop.indexOfFirst { cleanName(it.name).contains(part) }
@@ -2160,7 +2232,6 @@ object RosterData {
                 isTop = true
                 targetIndex = bestMatchIndex
             } else {
-                // Look in bottomEmployees
                 bestMatchIndex = currentBottom.indexOfFirst { cleanName(it.name) == cleanParsed }
                 if (bestMatchIndex == -1) {
                     bestMatchIndex = currentBottom.indexOfFirst { 
@@ -2181,12 +2252,29 @@ object RosterData {
                 }
             }
 
+            val shiftMap = mutableMapOf<Int, String>()
+            val codeCounts = mutableMapOf<String, Int>()
+
+            for (s in 0 until parsedShifts.length()) {
+                val shiftObj = parsedShifts.getJSONObject(s)
+                val dayNum = shiftObj.getInt("day")
+                if (dayNum in 1..daysInMonth) {
+                    val rawCode = shiftObj.getString("code")
+                    if (rawCode != "NONE" && rawCode.isNotEmpty()) {
+                        shiftMap[dayNum] = rawCode
+                        codeCounts[rawCode] = (codeCounts[rawCode] ?: 0) + 1
+                    }
+                }
+            }
+
+            val summaryStr = if (codeCounts.isEmpty()) "Žiadne zistené služby" else codeCounts.map { "${it.key}: ${it.value}x" }.joinToString(", ")
+            val dailyShiftsList = shiftMap.toList().sortedBy { it.first }
+
             if (targetIndex != -1) {
                 matchedCount++
                 val empToUpdate = if (isTop) currentTop[targetIndex] else currentBottom[targetIndex]
                 val updatedShiftsMap = empToUpdate.shifts.toMutableMap()
 
-                // Default all days to NONE first so we overwrite completely with template
                 for (day in 1..daysInMonth) {
                     updatedShiftsMap[day] = RosterCell(day, null, null)
                 }
@@ -2203,7 +2291,6 @@ object RosterData {
                     }
                 }
 
-                // Recalculate total hours (e.g. sum of 7,5 or 11,5)
                 var sumHours = 0.0
                 for (cell in updatedShiftsMap.values) {
                     val hStr = cell.hours?.replace(",", ".")
@@ -2218,21 +2305,61 @@ object RosterData {
                 } else {
                     currentBottom[targetIndex] = updatedEmp
                 }
+
+                previewsList.add(
+                    EmployeeShiftPreview(
+                        detectedName = parsedName,
+                        matchedName = empToUpdate.name,
+                        isTopGroup = isTop,
+                        shiftCount = shiftMap.size,
+                        shiftsSummary = summaryStr,
+                        dailyShiftsPreview = dailyShiftsList
+                    )
+                )
+            } else {
+                previewsList.add(
+                    EmployeeShiftPreview(
+                        detectedName = parsedName,
+                        matchedName = null,
+                        isTopGroup = null,
+                        shiftCount = shiftMap.size,
+                        shiftsSummary = summaryStr,
+                        dailyShiftsPreview = dailyShiftsList
+                    )
+                )
             }
         }
 
-        if (matchedCount > 0) {
-            // Update the main reactive lists on the main thread
-            withContext(Dispatchers.Main) {
-                topEmployees = currentTop
-                bottomEmployees = currentBottom
-                monthlyTopEmployees[activeMonth] = currentTop
-                monthlyBottomEmployees[activeMonth] = currentBottom
-                saveMonthlyRoster(context, activeMonth)
-            }
-        }
+        ParsedRosterPreview(
+            activeMonth = activeMonth,
+            monthName = slovakMonthName,
+            daysInMonth = daysInMonth,
+            totalDetectedInImage = employeesArray.length(),
+            matchedCount = matchedCount,
+            totalShiftsUpdated = totalShiftsUpdated,
+            updatedTopEmployees = currentTop,
+            updatedBottomEmployees = currentBottom,
+            employeePreviews = previewsList
+        )
+    }
 
-        Pair(matchedCount, totalShiftsUpdated)
+    suspend fun applyParsedRoster(context: android.content.Context, preview: ParsedRosterPreview) {
+        withContext(Dispatchers.Main) {
+            topEmployees = preview.updatedTopEmployees
+            bottomEmployees = preview.updatedBottomEmployees
+            monthlyTopEmployees[preview.activeMonth] = preview.updatedTopEmployees
+            monthlyBottomEmployees[preview.activeMonth] = preview.updatedBottomEmployees
+            saveMonthlyRoster(context, preview.activeMonth)
+        }
+    }
+
+    suspend fun analyzeAndApplyRosterFromImage(
+        context: android.content.Context,
+        bitmap: Bitmap
+    ): Pair<Int, Int> {
+        val preview = analyzeRosterFromImage(context, bitmap)
+        applyParsedRoster(context, preview)
+        return Pair(preview.matchedCount, preview.totalShiftsUpdated)
     }
 
     private fun cleanName(name: String): String {
@@ -2249,6 +2376,27 @@ object RosterData {
 }
 
 data class CellColors(
-    val background: Color,
-    val text: Color
+    val background: androidx.compose.ui.graphics.Color,
+    val text: androidx.compose.ui.graphics.Color
+)
+
+data class EmployeeShiftPreview(
+    val detectedName: String,
+    val matchedName: String?,
+    val isTopGroup: Boolean?,
+    val shiftCount: Int,
+    val shiftsSummary: String,
+    val dailyShiftsPreview: List<Pair<Int, String>>
+)
+
+data class ParsedRosterPreview(
+    val activeMonth: Int,
+    val monthName: String,
+    val daysInMonth: Int,
+    val totalDetectedInImage: Int,
+    val matchedCount: Int,
+    val totalShiftsUpdated: Int,
+    val updatedTopEmployees: List<RosterEmployee>,
+    val updatedBottomEmployees: List<RosterEmployee>,
+    val employeePreviews: List<EmployeeShiftPreview>
 )

@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/roster_planner_logo_1781120296761"
+        android:drawable="@drawable/roster_minimalist_shift_icon_1784163401763"
         android:gravity="center" />
 </layer-list>
