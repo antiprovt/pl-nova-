@@ -4392,14 +4392,27 @@ fun MonthStatisticsView(
     var parCount = 0
     var noneCount = 0
 
+    var morningHoursSum = 0.0
+    var morningEarningsSum = 0.0
+
+    var nightShiftHoursSum = 0.0
+    var nightEarningsSum = 0.0
+
+    var overtimeHoursSum = 0.0
+    var overtimeEarningsSum = 0.0
+
+    var meetingHoursSum = 0.0
+    var meetingEarningsSum = 0.0
+
+    var trainingHoursSum = 0.0
+    var trainingEarningsSum = 0.0
+
     var totalWorkedHours = 0.0
 
     var nightHoursSum = 0.0
     var saturdayHoursSum = 0.0
     var sundayHoursSum = 0.0
     var holidayHoursSum = 0.0
-
-    var overtimeHoursSum = 0.0
 
     val basicHourlyRate = tariffSalary.toDouble() / 177.0
     var computedBasicWage = 0.0
@@ -4410,12 +4423,34 @@ fun MonthStatisticsView(
     var computedHolidaySurcharge = 0.0
 
     monthShiftDays.forEach { d ->
+        val comp = calculateDayWageComponents(d, basicHourlyRate, shiftDays)
+
         when (d.shiftType) {
-            "MORNING", "MORNING_PR" -> morningCount++
-            "NIGHT", "NIGHT_PN" -> nightCount++
-            "OVERTIME" -> overtimeCount++
-            "MEETING" -> meetingCount++
-            "TRAINING" -> trainingCount++
+            "MORNING", "MORNING_PR" -> {
+                morningCount++
+                morningHoursSum += comp.workedHours
+                morningEarningsSum += comp.totalSurchargesAndWage
+            }
+            "NIGHT", "NIGHT_PN" -> {
+                nightCount++
+                nightShiftHoursSum += comp.workedHours
+                nightEarningsSum += comp.totalSurchargesAndWage
+            }
+            "OVERTIME" -> {
+                overtimeCount++
+                overtimeHoursSum += comp.workedHours
+                overtimeEarningsSum += comp.totalSurchargesAndWage
+            }
+            "MEETING" -> {
+                meetingCount++
+                meetingHoursSum += comp.workedHours
+                meetingEarningsSum += comp.totalSurchargesAndWage
+            }
+            "TRAINING" -> {
+                trainingCount++
+                trainingHoursSum += comp.workedHours
+                trainingEarningsSum += comp.totalSurchargesAndWage
+            }
             "VACATION" -> vacationCount++
             "SICK" -> sickCount++
             "KZ" -> kzCount++
@@ -4423,9 +4458,7 @@ fun MonthStatisticsView(
             else -> noneCount++
         }
 
-        val comp = calculateDayWageComponents(d, basicHourlyRate, shiftDays)
         totalWorkedHours += comp.workedHours
-        overtimeHoursSum += comp.overtimeHours
         nightHoursSum += comp.nightHours
         saturdayHoursSum += comp.saturdayHours
         sundayHoursSum += comp.sundayHours
@@ -4486,6 +4519,77 @@ fun MonthStatisticsView(
         }
     }
 
+    // Math computations for salary & shift earnings
+    val reducedTariffSalary = tariffSalary.toDouble() * (1.0 - 0.078)
+    val reducedHourlyRate = reducedTariffSalary / 177.0
+    val dailyPnBasis = 8 * reducedHourlyRate // Calculated with 7.8% deduction from tariff salary
+
+    // Calculate PN
+    var computedPnPay = 0.0
+    for (i in 1..singleDaySickCount) {
+        computedPnPay += if (i <= 3) {
+            dailyPnBasis * 0.25
+        } else {
+            dailyPnBasis * 0.55
+        }
+    }
+
+    // Calculate Vacation Pay (D - Dovolenka: 96.83 € * 0.922 / deň with 7.8% deduction from tariff salary)
+    val computedVacationPay = vacationCount * (96.83 * 0.922)
+
+    // Calculate KZ Pay (KZ - Kondičné zariadenie: 193.79 € / 2 * 0.922 / deň with 7.8% deduction from tariff salary)
+    val computedKzPay = kzCount * ((193.79 / 2.0) * 0.922)
+
+    // Calculate Paragraf Pay (P / Par - Návšteva lekára: 96.83 € * 0.922 / deň with 7.8% deduction from tariff salary)
+    val computedParPay = parCount * (96.83 * 0.922)
+
+    val fundOfHours = run {
+        val isDec2025 = (selectedMonth.year == 2025 && selectedMonth.monthValue == 12)
+        val isJan2026 = (selectedMonth.year == 2026 && selectedMonth.monthValue == 1)
+        
+        if (isDec2025) {
+            if (defaultShiftLength == 12) 172.5 else 161.0
+        } else if (isJan2026) {
+            if (defaultShiftLength == 12) 180.0 else 168.0
+        } else {
+            var wkDays = 0
+            val numDays = selectedMonth.lengthOfMonth()
+            for (day in 1..numDays) {
+                val date = selectedMonth.atDay(day)
+                val dayOfWeek = date.dayOfWeek.value
+                val isWeekend = (dayOfWeek == 6 || dayOfWeek == 7)
+                val isHoliday = when (selectedMonth.monthValue) {
+                    1 -> day == 1 || day == 6
+                    5 -> day == 1 || day == 8
+                    7 -> day == 5
+                    8 -> day == 29
+                    9 -> day == 1 || day == 15
+                    11 -> day == 1 || day == 17
+                    12 -> day == 24 || day == 25 || day == 26
+                    else -> false
+                }
+                if (!isWeekend && !isHoliday) {
+                    wkDays++
+                }
+            }
+            if (defaultShiftLength == 12) wkDays * 8.0 else wkDays * 7.5
+        }
+    }
+
+    val personalAllowanceBase = if (personalAllowance > 0f) personalAllowance.toDouble() else 380.0
+    val workedRatio = if (fundOfHours > 0.0) totalWorkedHours / fundOfHours else 0.0
+    val workedPercentage = workedRatio * 100.0
+    val personalAllowanceVal = workedRatio * personalAllowanceBase
+
+    val shiftAllowanceVal = shiftAllowance.toDouble()
+    val workedShiftsForMeal = monthShiftDays.count { d ->
+        d.shiftType in listOf("MORNING", "MORNING_PR", "NIGHT", "NIGHT_PN", "OVERTIME", "MEETING")
+    }
+    val isWholeMonthSickOrVacation = (sickCount == daysInMonthSum) || (vacationCount == daysInMonthSum) || ((sickCount + vacationCount) == daysInMonthSum)
+    val mvAllowance = if (workedShiftsForMeal >= 2 && !isWholeMonthSickOrVacation) 20.0 else 0.0
+    val computedMealAllowance = workedShiftsForMeal * 4.34
+    val totalWageEstimate = computedBasicWage + computedOvertimeSurcharge + computedNightSurcharge + computedSaturdaySurcharge + computedSundaySurcharge + computedHolidaySurcharge + computedPnPay + computedVacationPay + computedKzPay + computedParPay + personalAllowanceVal + shiftAllowanceVal + mvAllowance + computedMealAllowance
+
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -4495,75 +4599,6 @@ fun MonthStatisticsView(
         // TILE 0: SALARY ESTIMATE (Odhad výplaty)
         item {
             var isExpanded by remember { mutableStateOf(false) }
-
-            // Math computations
-            val dailyPnBasis = 8 * basicHourlyRate // 42.32
-
-            // Calculate PN
-            var computedPnPay = 0.0
-            for (i in 1..singleDaySickCount) {
-                computedPnPay += if (i <= 3) {
-                    dailyPnBasis * 0.25
-                } else {
-                    dailyPnBasis * 0.55
-                }
-            }
-
-            // Calculate Vacation Pay (D - Dovolenka: 96.83 € / deň)
-            val computedVacationPay = vacationCount * 96.83
-
-            // Calculate KZ Pay (KZ - Kondičné zariadenie / Kĺzavé voľno: 193.79 € za 2 dni, t.j. 96.895 € / deň)
-            val computedKzPay = kzCount * (193.79 / 2.0)
-
-            // Calculate Paragraf Pay (P / Par - Návšteva lekára: 96.83 € / deň)
-            val computedParPay = parCount * 96.83
-
-            val fundOfHours = run {
-                val isDec2025 = (selectedMonth.year == 2025 && selectedMonth.monthValue == 12)
-                val isJan2026 = (selectedMonth.year == 2026 && selectedMonth.monthValue == 1)
-                
-                if (isDec2025) {
-                    if (defaultShiftLength == 12) 172.5 else 161.0
-                } else if (isJan2026) {
-                    if (defaultShiftLength == 12) 180.0 else 168.0
-                } else {
-                    var wkDays = 0
-                    val numDays = selectedMonth.lengthOfMonth()
-                    for (day in 1..numDays) {
-                        val date = selectedMonth.atDay(day)
-                        val dayOfWeek = date.dayOfWeek.value
-                        val isWeekend = (dayOfWeek == 6 || dayOfWeek == 7)
-                        val isHoliday = when (selectedMonth.monthValue) {
-                            1 -> day == 1 || day == 6
-                            5 -> day == 1 || day == 8
-                            7 -> day == 5
-                            8 -> day == 29
-                            9 -> day == 1 || day == 15
-                            11 -> day == 1 || day == 17
-                            12 -> day == 24 || day == 25 || day == 26
-                            else -> false
-                        }
-                        if (!isWeekend && !isHoliday) {
-                            wkDays++
-                        }
-                    }
-                    if (defaultShiftLength == 12) wkDays * 8.0 else wkDays * 7.5
-                }
-            }
-
-            val personalAllowanceBase = if (personalAllowance > 0f) personalAllowance.toDouble() else 380.0
-            val workedRatio = if (fundOfHours > 0.0) totalWorkedHours / fundOfHours else 0.0
-            val workedPercentage = workedRatio * 100.0
-            val personalAllowanceVal = workedRatio * personalAllowanceBase
-
-            val shiftAllowanceVal = shiftAllowance.toDouble()
-            val workedShiftsForMeal = monthShiftDays.count { d ->
-                d.shiftType in listOf("MORNING", "MORNING_PR", "NIGHT", "NIGHT_PN", "OVERTIME", "MEETING")
-            }
-            val isWholeMonthSickOrVacation = (sickCount == daysInMonthSum) || (vacationCount == daysInMonthSum) || ((sickCount + vacationCount) == daysInMonthSum)
-            val mvAllowance = if (workedShiftsForMeal >= 2 && !isWholeMonthSickOrVacation) 20.0 else 0.0
-            val computedMealAllowance = workedShiftsForMeal * 4.34
-            val totalWageEstimate = computedBasicWage + computedOvertimeSurcharge + computedNightSurcharge + computedSaturdaySurcharge + computedSundaySurcharge + computedHolidaySurcharge + computedPnPay + computedVacationPay + computedKzPay + computedParPay + personalAllowanceVal + shiftAllowanceVal + mvAllowance + computedMealAllowance
 
             // Net salary computation according to Slovak legislation (2026 guidelines)
             // Note: Príplatok iné (shiftAllowanceVal) is exempt from taxes/insurance according to laws
@@ -4692,14 +4727,250 @@ fun MonthStatisticsView(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // TABLE: Podrobný prehľad odpracovaných hodín a zárobku (Directly below salary estimate)
+                    val workedPercentageFormatted = String.format(java.util.Locale.US, "%.1f", workedPercentage).replace(".", ",")
+                    val workedHoursFormatted = String.format(java.util.Locale.US, "%.1f", totalWorkedHours).replace(".", ",")
+                    val fundOfHoursFormatted = String.format(java.util.Locale.US, "%.1f", fundOfHours).replace(".", ",")
+                    val osobneBaseFormatted = String.format(java.util.Locale.US, "%.2f", personalAllowanceBase).replace(".", ",")
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Podrobný prehľad odpracovaných hodín a zárobku",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                            Text(
+                                text = "Odpracované služby a činnosti",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            if (morningCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Denná zmena (D)",
+                                    subtitle = "$morningCount ${if (morningCount == 1) "služba" else if (morningCount in 2..4) "služby" else "služieb"}",
+                                    hours = morningHoursSum,
+                                    earnings = morningEarningsSum
+                                )
+                            }
+
+                            if (nightCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Nočná zmena (N)",
+                                    subtitle = "$nightCount ${if (nightCount == 1) "služba" else if (nightCount in 2..4) "služby" else "služieb"}",
+                                    hours = nightShiftHoursSum,
+                                    earnings = nightEarningsSum
+                                )
+                            }
+
+                            if (overtimeCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Nadčas (NČ)",
+                                    subtitle = "$overtimeCount ${if (overtimeCount == 1) "služba" else if (overtimeCount in 2..4) "služby" else "služieb"}",
+                                    hours = overtimeHoursSum,
+                                    earnings = overtimeEarningsSum
+                                )
+                            }
+
+                            if (meetingCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Porada / Zhromaždenie",
+                                    subtitle = "$meetingCount ${if (meetingCount == 1) "služba" else if (meetingCount in 2..4) "služby" else "služieb"}",
+                                    hours = meetingHoursSum,
+                                    earnings = meetingEarningsSum
+                                )
+                            }
+
+                            if (trainingCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Školenie / Výcvik",
+                                    subtitle = "$trainingCount ${if (trainingCount == 1) "služba" else if (trainingCount in 2..4) "služby" else "služieb"}",
+                                    hours = trainingHoursSum,
+                                    earnings = trainingEarningsSum
+                                )
+                            }
+
+                            if (vacationCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Dovolenka (D)",
+                                    subtitle = "$vacationCount ${if (vacationCount == 1) "deň" else if (vacationCount in 2..4) "dni" else "dní"}",
+                                    hours = null,
+                                    earnings = computedVacationPay
+                                )
+                            }
+
+                            if (sickCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "PN / Práceneschopnosť",
+                                    subtitle = "$sickCount ${if (sickCount == 1) "deň" else if (sickCount in 2..4) "dni" else "dní"}",
+                                    hours = null,
+                                    earnings = computedPnPay
+                                )
+                            }
+
+                            if (kzCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Kondičné zariadenie (KZ)",
+                                    subtitle = "$kzCount ${if (kzCount == 1) "deň" else if (kzCount in 2..4) "dni" else "dní"}",
+                                    hours = null,
+                                    earnings = computedKzPay
+                                )
+                            }
+
+                            if (parCount > 0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Paragraf / Návšteva lekára (P)",
+                                    subtitle = "$parCount ${if (parCount == 1) "deň" else if (parCount in 2..4) "dni" else "dní"}",
+                                    hours = null,
+                                    earnings = computedParPay
+                                )
+                            }
+
+                            if (nightHoursSum > 0 || saturdayHoursSum > 0 || sundayHoursSum > 0 || holidayHoursSum > 0) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Text(
+                                    text = "Príplatky za odpracované hodiny (noci, víkendy, sviatky)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                if (nightHoursSum > 0) {
+                                    SurchargeRow(
+                                        label = "Príplatok za prácu v noci",
+                                        hours = nightHoursSum,
+                                        amount = computedNightSurcharge
+                                    )
+                                }
+
+                                if (saturdayHoursSum > 0) {
+                                    SurchargeRow(
+                                        label = "Príplatok za sobotu",
+                                        hours = saturdayHoursSum,
+                                        amount = computedSaturdaySurcharge
+                                    )
+                                }
+
+                                if (sundayHoursSum > 0) {
+                                    SurchargeRow(
+                                        label = "Príplatok za nedeľu",
+                                        hours = sundayHoursSum,
+                                        amount = computedSundaySurcharge
+                                    )
+                                }
+
+                                if (holidayHoursSum > 0) {
+                                    SurchargeRow(
+                                        label = "Príplatok za sviatok",
+                                        hours = holidayHoursSum,
+                                        amount = computedHolidaySurcharge
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Text(
+                                text = "Mesačné príplatky a príspevky",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            ShiftHoursEarningsRow(
+                                title = "Osobný príplatok",
+                                subtitle = "Odpracované $workedHoursFormatted z $fundOfHoursFormatted h ($workedPercentageFormatted% z $osobneBaseFormatted €)",
+                                hours = null,
+                                earnings = personalAllowanceVal
+                            )
+
+                            ShiftHoursEarningsRow(
+                                title = "Príplatok iné",
+                                subtitle = "Fixný mesačný príplatok",
+                                hours = null,
+                                earnings = shiftAllowanceVal
+                            )
+
+                            if (mvAllowance > 0.0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Príplatok za MV",
+                                    subtitle = "Fixný príspevok MV",
+                                    hours = null,
+                                    earnings = mvAllowance
+                                )
+                            }
+
+                            if (computedMealAllowance > 0.0) {
+                                ShiftHoursEarningsRow(
+                                    title = "Stravné / Gastrolístky",
+                                    subtitle = "$workedShiftsForMeal odprac. ${if (workedShiftsForMeal == 1) "služba" else if (workedShiftsForMeal in 2..4) "služby" else "služieb"} × 4,34 €",
+                                    hours = null,
+                                    earnings = computedMealAllowance
+                                )
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Celkovo odpracované",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    val hFormatted = if (totalWorkedHours % 1.0 == 0.0) "${totalWorkedHours.toInt()}" else String.format(java.util.Locale.US, "%.1f", totalWorkedHours).replace(".", ",")
+                                    Text(
+                                        text = "$hFormatted h",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "Hrubá mzda (Brutto)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = String.format(java.util.Locale("sk", "SK"), "%.2f €", totalWageEstimate),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     if (!isExpanded) {
-                        Spacer(modifier = Modifier.height(12.dp))
                         Box(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             Text(
-                                text = "Zobraziť položky a odvody",
+                                text = "Zobraziť odvody, daň a príplatky",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -4788,7 +5059,7 @@ fun MonthStatisticsView(
                                 val slovakPnDays = if (sickCount == 1) "1 deň" else if (sickCount < 5) "$sickCount dni" else "$sickCount dní"
                                 SalaryDetailRow(
                                     title = "Nemocenské (PN) náhrada príjmu",
-                                    subtitle = "1.-3. deň 25%, od 4. dňa 55% z $dailyPnBasisFormatted €/deň | $slovakPnDays",
+                                    subtitle = "1.-3. deň 25%, od 4. dňa 55% z $dailyPnBasisFormatted €/deň (-7,8% z tarifu) | $slovakPnDays",
                                     value = computedPnPay
                                 )
                             }
@@ -4796,9 +5067,10 @@ fun MonthStatisticsView(
                             // Dovolenka details (D)
                             if (vacationCount > 0) {
                                 val slovakVacDays = if (vacationCount == 1) "1 deň" else if (vacationCount < 5) "$vacationCount dni" else "$vacationCount dní"
+                                val vacRateFormatted = String.format(java.util.Locale.US, "%.2f", 96.83 * 0.922).replace(".", ",")
                                 SalaryDetailRow(
                                     title = "Náhrada za dovolenku (D)",
-                                    subtitle = "Sadzba 96,83 € / deň | $slovakVacDays",
+                                    subtitle = "Sadzba $vacRateFormatted € / deň (-7,8% z tarif. platu) | $slovakVacDays",
                                     value = computedVacationPay
                                 )
                             }
@@ -4806,9 +5078,10 @@ fun MonthStatisticsView(
                             // Paragraf details (P)
                             if (parCount > 0) {
                                 val slovakParDays = if (parCount == 1) "1 deň" else if (parCount < 5) "$parCount dni" else "$parCount dní"
+                                val parRateFormatted = String.format(java.util.Locale.US, "%.2f", 96.83 * 0.922).replace(".", ",")
                                 SalaryDetailRow(
                                     title = "Náhrada za Paragraf (P - návšteva lekára)",
-                                    subtitle = "Sadzba 96,83 € / deň | $slovakParDays",
+                                    subtitle = "Sadzba $parRateFormatted € / deň (-7,8% z tarif. platu) | $slovakParDays",
                                     value = computedParPay
                                 )
                             }
@@ -4816,18 +5089,15 @@ fun MonthStatisticsView(
                             // KZ details (KZ)
                             if (kzCount > 0) {
                                 val slovakKzDays = if (kzCount == 1) "1 deň" else if (kzCount < 5) "$kzCount dni" else "$kzCount dní"
+                                val kzRateFormatted = String.format(java.util.Locale.US, "%.2f", (193.79 / 2.0) * 0.922).replace(".", ",")
                                 SalaryDetailRow(
-                                    title = "Náhrada za KZ (spravidla 2 dni po sebe = 193,79 €)",
-                                    subtitle = "Sadzba 193,79 € / 2 dni (96,90 €/deň) | $slovakKzDays",
+                                    title = "Náhrada za KZ (spravidla 2 dni po sebe)",
+                                    subtitle = "Sadzba $kzRateFormatted € / deň (-7,8% z tarif. platu) | $slovakKzDays",
                                     value = computedKzPay
                                 )
                             }
 
                             // 6. Osobný príplatok
-                            val workedPercentageFormatted = String.format(java.util.Locale.US, "%.1f", workedPercentage).replace(".", ",")
-                            val workedHoursFormatted = String.format(java.util.Locale.US, "%.1f", totalWorkedHours).replace(".", ",")
-                            val fundOfHoursFormatted = String.format(java.util.Locale.US, "%.1f", fundOfHours).replace(".", ",")
-                            val osobneBaseFormatted = String.format(java.util.Locale.US, "%.2f", personalAllowanceBase).replace(".", ",")
                             SalaryDetailRow(
                                 title = "Osobný príplatok",
                                 subtitle = "Odpracované: $workedHoursFormatted z $fundOfHoursFormatted h ($workedPercentageFormatted% z $osobneBaseFormatted €)",
@@ -5043,65 +5313,6 @@ fun MonthStatisticsView(
                 }
             }
         }
-
-        // TILE 2: HOURS DETAIL BREAKDOWN (White tile, detailed hours breakdown)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                border = BorderStroke(1.dp, Color(0xFFCAC4D0).copy(alpha = 0.3f)),
-                shape = RoundedCornerShape(24.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Podrobný prehľad odpracovaných hodín",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    HoursDetailRow(
-                        label = "Celkovo odpracované hodiny (zmeny + nadčasy)",
-                        hours = totalWorkedHours
-                    )
-                    
-                    if (nightHoursSum > 0) {
-                        HoursDetailRow(
-                            label = "Odpracované hodiny v noci",
-                            hours = nightHoursSum
-                        )
-                    }
-                    
-                    if (saturdayHoursSum > 0) {
-                        HoursDetailRow(
-                            label = "Odpracované hodiny v sobotu",
-                            hours = saturdayHoursSum
-                        )
-                    }
-                    if (sundayHoursSum > 0) {
-                        HoursDetailRow(
-                            label = "Odpracované hodiny v nedeľu",
-                            hours = sundayHoursSum
-                        )
-                    }
-                    
-                    if (holidayHoursSum > 0) {
-                        HoursDetailRow(
-                            label = "Odpracované hodiny vo sviatky",
-                            hours = holidayHoursSum
-                        )
-                    }
-                }
-            }
-        }
-
-
-
-
-
     }
 }
 
@@ -5210,13 +5421,13 @@ fun MonthOverviewView(
     var dailyParPay = 0.0
 
     if (shiftDay.shiftType == "VACATION") {
-        dailyVacationPay = 96.83
+        dailyVacationPay = 96.83 * 0.922
     }
     if (shiftDay.shiftType == "Par") {
-        dailyParPay = 96.83
+        dailyParPay = 96.83 * 0.922
     }
     if (shiftDay.shiftType == "KZ") {
-        dailyKzPay = 193.79 / 2.0
+        dailyKzPay = (193.79 / 2.0) * 0.922
     }
 
     val dailyTotalEstimate = dailyBasicWage + dailyOvertimeWage + dailyNightPay + dailyWeekendPay + dailyHolidayPay + dailyPnPay + dailyVacationPay + dailyKzPay + dailyParPay
@@ -5872,6 +6083,76 @@ fun HoursDetailRow(label: String, hours: Double) {
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+fun ShiftHoursEarningsRow(
+    title: String,
+    subtitle: String,
+    hours: Double?,
+    earnings: Double
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            val detailsText = if (hours != null && hours > 0.0) {
+                val hFormatted = if (hours % 1.0 == 0.0) "${hours.toInt()}" else String.format(java.util.Locale.US, "%.1f", hours).replace(".", ",")
+                "$subtitle • $hFormatted h"
+            } else {
+                subtitle
+            }
+            Text(
+                text = detailsText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            text = String.format(java.util.Locale("sk", "SK"), "%.2f €", earnings),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+fun SurchargeRow(
+    label: String,
+    hours: Double,
+    amount: Double
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val hFormatted = if (hours % 1.0 == 0.0) "${hours.toInt()}" else String.format(java.util.Locale.US, "%.1f", hours).replace(".", ",")
+        Text(
+            text = "$label ($hFormatted h)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = String.format(java.util.Locale("sk", "SK"), "+%.2f €", amount),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF2E7D32)
         )
     }
 }

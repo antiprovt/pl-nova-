@@ -105,11 +105,14 @@ object FirebaseSync {
 
             db = FirebaseFirestore.getInstance(app)
             
-            // Subscribe for FCM messages
+            // Subscribe for FCM messages safely
             try {
                 FirebaseMessaging.getInstance().subscribeToTopic("roster_updates")
+                    .addOnFailureListener { e ->
+                        Log.w(TAG, "FCM topic subscription not available or reached limit: ${e.message}")
+                    }
             } catch (e: Exception) {
-                Log.e(TAG, "FCM subscription error", e)
+                Log.w(TAG, "FCM subscription error", e)
             }
 
             // Save settings to SharedPreferences
@@ -182,7 +185,7 @@ object FirebaseSync {
         activeListener = localDb.collection("rosters").document(monthDocId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.e(TAG, "Firestore listen failed", error)
+                    Log.w(TAG, "Firestore listen notice: ${error.message}")
                     return@addSnapshotListener
                 }
 
