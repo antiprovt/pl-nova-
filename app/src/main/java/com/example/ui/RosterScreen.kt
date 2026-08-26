@@ -53,7 +53,10 @@ sealed class RosterItem {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun RosterScreen(modifier: Modifier = Modifier) {
+fun RosterScreen(
+    modifier: Modifier = Modifier,
+    onOpenShichterForOfficer: ((String) -> Unit)? = null
+) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedHighlightCode by remember { mutableStateOf<String?>(null) }
     var selectedCellDetail by remember { mutableStateOf<RosterCellDetail?>(null) }
@@ -64,7 +67,7 @@ fun RosterScreen(modifier: Modifier = Modifier) {
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
-    val loggedInUser = remember { prefs.getString("logged_in_user_name", "") ?: "" }
+    val loggedInUser = prefs.getString("logged_in_user_name", "") ?: ""
     val canEdit = remember(loggedInUser) {
         val u = loggedInUser.trim().lowercase()
         u == "admin" || u == "riegert" || u == "rieger t." || com.example.ui.RosterPermissions.isAdminOrPoverena(loggedInUser, prefs)
@@ -1298,7 +1301,8 @@ fun RosterScreen(modifier: Modifier = Modifier) {
     editingEmployee?.let { employee ->
         EditEmployeeDialog(
             employee = employee,
-            onDismiss = { editingEmployee = null }
+            onDismiss = { editingEmployee = null },
+            onOpenShichterForOfficer = onOpenShichterForOfficer
         )
     }
 }
@@ -1503,7 +1507,8 @@ fun AddEmployeeDialog(
 @Composable
 fun EditEmployeeDialog(
     employee: RosterEmployee,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenShichterForOfficer: ((String) -> Unit)? = null
 ) {
     var name by remember { mutableStateOf(employee.name) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -1538,6 +1543,32 @@ fun EditEmployeeDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
+                if (onOpenShichterForOfficer != null) {
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            onOpenShichterForOfficer(employee.name)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Upraviť šichter príslušníka",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 if (showDeleteConfirm) {
                     Surface(
@@ -1668,6 +1699,8 @@ fun CellDetailDialog(
     onDismiss: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
+    val activeUserName = prefs.getString("logged_in_user_name", "") ?: prefs.getString("user_name", "") ?: ""
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     if (!canEdit) {
@@ -2156,18 +2189,22 @@ fun CellDetailDialog(
                                     toDay = targetDay,
                                     deleteSource = false
                                 )
-                                val mName = if (RosterData.activeRosterMonth == 0) "december" else "január"
+                                 val mName = if (RosterData.activeRosterMonth == 0) "december" else "január"
                                 RosterData.triggerRosterNotification(
-                                    context,
-                                    "Zmena v rozpise: ${detail.employeeName}",
-                                    "Vaša služba na deň $targetDay. $mName 2026 bola skopírovaná."
+                                    context = context,
+                                    title = "Zmena v rozpise: ${detail.employeeName}",
+                                    message = "Vaša služba na deň $targetDay. $mName 2026 bola skopírovaná.",
+                                    targetOfficer = detail.employeeName,
+                                    sender = activeUserName
                                 )
                                 val leader = findLeaderForEmployee(detail.employeeName)
                                 if (leader != null) {
                                     RosterData.triggerRosterNotification(
-                                        context,
-                                        "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
-                                        "Služba príslušníka ${detail.employeeName} na deň $targetDay. $mName 2026 bola skopírovaná."
+                                        context = context,
+                                        title = "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
+                                        message = "Služba príslušníka ${detail.employeeName} na deň $targetDay. $mName 2026 bola skopírovaná.",
+                                        targetOfficer = leader,
+                                        sender = activeUserName
                                     )
                                 }
                                 onDismiss()
@@ -2200,16 +2237,20 @@ fun CellDetailDialog(
                                 )
                                 val mName = if (RosterData.activeRosterMonth == 0) "december" else "január"
                                 RosterData.triggerRosterNotification(
-                                    context,
-                                    "Zmena v rozpise: ${detail.employeeName}",
-                                    "Vaša služba bola presunutá z dňa ${detail.day}. na deň $targetDay. $mName."
+                                    context = context,
+                                    title = "Zmena v rozpise: ${detail.employeeName}",
+                                    message = "Vaša služba bola presunutá z dňa ${detail.day}. na deň $targetDay. $mName.",
+                                    targetOfficer = detail.employeeName,
+                                    sender = activeUserName
                                 )
                                 val leader = findLeaderForEmployee(detail.employeeName)
                                 if (leader != null) {
                                     RosterData.triggerRosterNotification(
-                                        context,
-                                        "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
-                                        "Služba príslušníka ${detail.employeeName} bola presunutá z dňa ${detail.day}. na deň $targetDay. $mName."
+                                        context = context,
+                                        title = "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
+                                        message = "Služba príslušníka ${detail.employeeName} bola presunutá z dňa ${detail.day}. na deň $targetDay. $mName.",
+                                        targetOfficer = leader,
+                                        sender = activeUserName
                                     )
                                 }
                                 onDismiss()
@@ -2247,16 +2288,20 @@ fun CellDetailDialog(
                             RosterData.updateCell(detail.employeeName, detail.day, null, null)
                             val mName = if (RosterData.activeRosterMonth == 0) "december" else "január"
                             RosterData.triggerRosterNotification(
-                                context,
-                                "Zmena v rozpise: ${detail.employeeName}",
-                                "Vaša služba na deň ${detail.day}. $mName bola zrušená (Voľno)."
+                                context = context,
+                                title = "Zmena v rozpise: ${detail.employeeName}",
+                                message = "Vaša služba na deň ${detail.day}. $mName bola zrušená (Voľno).",
+                                targetOfficer = detail.employeeName,
+                                sender = activeUserName
                             )
                             val leader = findLeaderForEmployee(detail.employeeName)
                             if (leader != null) {
                                 RosterData.triggerRosterNotification(
-                                    context,
-                                    "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
-                                    "Služba príslušníka ${detail.employeeName} na deň ${detail.day}. $mName bola zrušená (Voľno)."
+                                    context = context,
+                                    title = "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
+                                    message = "Služba príslušníka ${detail.employeeName} na deň ${detail.day}. $mName bola zrušená (Voľno).",
+                                    targetOfficer = leader,
+                                    sender = activeUserName
                                 )
                             }
                             onDismiss()
@@ -2287,16 +2332,20 @@ fun CellDetailDialog(
                                 val cellDesc = if (selectedCode.isBlank()) "Voľno" else "$selectedCode ($customHours hod)"
                                 val mName = if (RosterData.activeRosterMonth == 0) "december" else "január"
                                 RosterData.triggerRosterNotification(
-                                    context,
-                                    "Zmena v rozpise: ${detail.employeeName}",
-                                    "Vaša služba na deň ${detail.day}. $mName bola upravená na $cellDesc."
+                                    context = context,
+                                    title = "Zmena v rozpise: ${detail.employeeName}",
+                                    message = "Vaša služba na deň ${detail.day}. $mName bola upravená na $cellDesc.",
+                                    targetOfficer = detail.employeeName,
+                                    sender = activeUserName
                                 )
                                 val leader = findLeaderForEmployee(detail.employeeName)
                                 if (leader != null) {
                                     RosterData.triggerRosterNotification(
-                                        context,
-                                        "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
-                                        "Služba príslušníka ${detail.employeeName} na deň ${detail.day}. $mName bola upravená na $cellDesc."
+                                        context = context,
+                                        title = "Zmena v rozpise: ${detail.employeeName} (Veliteľ $leader)",
+                                        message = "Služba príslušníka ${detail.employeeName} na deň ${detail.day}. $mName bola upravená na $cellDesc.",
+                                        targetOfficer = leader,
+                                        sender = activeUserName
                                     )
                                 }
                                 onDismiss()

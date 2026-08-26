@@ -265,15 +265,14 @@ object RosterData {
     var onCellUpdatedExternal: ((String, Int, String?, String?) -> Unit)? = null
 
     // Proactive full sync of roster shifts to shift tracker database
-    fun syncRosterToSichereForUser(employeeName: String, monthIndex: Int) {
+    fun syncRosterToSichereForUser(employeeName: String, monthIndex: Int, context: android.content.Context? = null) {
         val ym = getYearMonthForIndex(monthIndex)
         val numDays = ym.lengthOfMonth()
         
-        val topList = monthlyTopEmployees[monthIndex] ?: emptyList()
-        val bottomList = monthlyBottomEmployees[monthIndex] ?: emptyList()
+        val (topList, bottomList) = if (context != null) ensureMonthLoaded(context, monthIndex) else Pair(monthlyTopEmployees[monthIndex] ?: emptyList(), monthlyBottomEmployees[monthIndex] ?: emptyList())
         val combined = topList + bottomList
         
-        val emp = combined.find { it.name.trim().equals(employeeName.trim(), ignoreCase = true) }
+        val emp = combined.find { isSameOfficer(it.name, employeeName) }
         if (emp != null) {
             val oldActive = activeRosterMonth
             activeRosterMonth = monthIndex
@@ -285,8 +284,45 @@ object RosterData {
         }
     }
 
-    // Reactive in-app notifications list
-    var inAppNotifications by mutableStateOf<List<Triple<String, String, Long>>>(emptyList())
+    fun getAllKnownOfficerNames(context: android.content.Context? = null): List<String> {
+        val names = mutableSetOf<String>()
+        names.addAll(topEmployees.map { it.name })
+        names.addAll(bottomEmployees.map { it.name })
+        monthlyTopEmployees.values.forEach { list -> names.addAll(list.map { it.name }) }
+        monthlyBottomEmployees.values.forEach { list -> names.addAll(list.map { it.name }) }
+        names.addAll(decemberTopEmployees.map { it.name })
+        names.addAll(decemberBottomEmployees.map { it.name })
+        names.addAll(nextMonthTopEmployees.map { it.name })
+        names.addAll(nextMonthBottomEmployees.map { it.name })
+        names.add("test")
+
+        if (context != null) {
+            val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
+            names.addAll(RosterPermissions.getGrantedUsers(prefs))
+            names.addAll(RosterPermissions.getPovereneOsoby(prefs))
+            val loggedInUser = prefs.getString("logged_in_user_name", "") ?: ""
+            if (loggedInUser.isNotBlank() && !loggedInUser.equals("admin", ignoreCase = true)) {
+                names.add(loggedInUser)
+            }
+        }
+
+        return names
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.equals("admin", ignoreCase = true) && !it.contains("oberfranc", ignoreCase = true) }
+            .distinct()
+            .sorted()
+    }
+
+    // Reactive in-app notifications list: id, title, text, timestamp, isRead
+    var inAppNotifications by mutableStateOf<List<NotificationItem>>(emptyList())
+
+    data class NotificationItem(
+        val id: String,
+        val title: String,
+        val text: String,
+        val timestamp: Long,
+        val isRead: Boolean
+    )
 
     fun loadInAppNotifications(context: android.content.Context) {
         val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
@@ -294,36 +330,170 @@ object RosterData {
         inAppNotifications = currentSet.mapNotNull { item ->
             val parts = item.split("|")
             if (parts.size >= 4) {
+                val id = parts[0]
                 val title = parts[1]
                 val text = parts[2]
                 val ts = parts[3].toLongOrNull() ?: 0L
-                Triple(title, text, ts)
+                val isRead = if (parts.size >= 5) parts[4].toBoolean() else false
+                NotificationItem(id, title, text, ts, isRead)
             } else {
                 null
             }
-        }.sortedByDescending { it.third }
+        }.sortedByDescending { it.timestamp }
     }
 
-    fun triggerRosterNotification(context: android.content.Context, title: String, message: String) {
+    fun cleanOfficerName(s: String): String {
+        if (s.isBlank()) return ""
+        val unaccented = java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+        return unaccented
+            .replace("bc.", "").replace("mgr.", "").replace("ing.", "").replace("judr.", "").replace("phdr.", "").replace("mudr.", "")
+            .replace("bc", "").replace("mgr", "").replace("ing", "").replace("judr", "").replace("phdr", "").replace("mudr", "")
+            .replace("por.", "").replace("npor.", "").replace("kpt.", "").replace("mjr.", "").replace("pplk.", "").replace("plk.", "")
+            .replace("strzm.", "").replace("prap.", "").replace("nprap.", "").replace("pprap.", "")
+            .replace("por", "").replace("npor", "").replace("kpt", "").replace("mjr", "").replace("pplk", "").replace("plk", "")
+            .replace("strzm", "").replace("prap", "").replace("nprap", "").replace("pprap", "")
+            .replace("velitel", "").replace("poverena osoba", "").replace("poverena", "")
+            .replace("administrator", "admin")
+            .replace("(", "").replace(")", "")
+            .replace(" ", "").replace(".", "").replace(",", "").trim()
+    }
+
+    fun isSameOfficer(name1: String?, name2: String?): Boolean {
+        if (name1.isNullOrBlank() || name2.isNullOrBlank()) return false
+        val n1 = name1.trim()
+        val n2 = name2.trim()
+        if (n1.equals(n2, ignoreCase = true)) return true
+        val c1 = cleanOfficerName(n1)
+        val c2 = cleanOfficerName(n2)
+        if (c1.isEmpty() || c2.isEmpty()) return false
+        if (c1 == c2) return true
+        return (c1.length >= 4 && c2.length >= 4 && (c1.contains(c2) || c2.contains(c1)))
+    }
+
+    fun triggerRosterNotification(
+        context: android.content.Context,
+        title: String,
+        message: String,
+        targetOfficer: String? = null,
+        sender: String = "Administrátor"
+    ) {
         val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
-        val isPushEnabled = prefs.getBoolean("roster_notifications_enabled", true)
+        val activeUserName = prefs.getString("logged_in_user_name", "") ?: prefs.getString("user_name", "") ?: ""
+
+        // Resolve target officer
+        val resolvedTarget = targetOfficer ?: run {
+            if (title.startsWith("Zmena v rozpise: ")) {
+                val namePart = title.removePrefix("Zmena v rozpise: ")
+                if (namePart.contains(" (Veliteľ ")) {
+                    namePart.substringAfter(" (Veliteľ ").removeSuffix(")").trim()
+                } else {
+                    namePart.substringBefore(" (").trim()
+                }
+            } else null
+        }
+
+        val senderFinal = if (sender.isNotBlank() && !sender.equals("Administrátor", ignoreCase = true)) sender else (if (activeUserName.isNotBlank()) activeUserName else sender)
+        var generatedMsgId: String? = null
+
+        // Send targeted Firestore message to selected officer (or broadcast if target is null)
+        try {
+            val firestoreDb = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            val msgRef = firestoreDb.collection("messages").document()
+            generatedMsgId = msgRef.id
+            
+            val targetType = if (!resolvedTarget.isNullOrBlank()) "individual" else "all"
+            val targetValue = resolvedTarget?.trim() ?: ""
+
+            val newMsg = hashMapOf(
+                "id" to msgRef.id,
+                "sender" to senderFinal,
+                "title" to title,
+                "body" to message,
+                "targetType" to targetType,
+                "targetValue" to targetValue,
+                "priority" to "1",
+                "createdAt" to java.time.Instant.now().toString(),
+                "readBy" to hashMapOf<String, String>()
+            )
+            msgRef.set(newMsg)
+        } catch (e: Exception) {
+            // Ignore if Firebase Firestore is unavailable
+        }
+
+        // Add in-app notification on THIS local device if local user is the target or if notification is targeted to officer
+        val isSender = activeUserName.isNotBlank() && isSameOfficer(senderFinal, activeUserName)
+        val isTarget = resolvedTarget.isNullOrBlank() || (activeUserName.isNotBlank() && isSameOfficer(resolvedTarget, activeUserName))
+
+        if (!isSender && isTarget) {
+            addInAppNotification(context, title, message, generatedMsgId)
+        }
+    }
+
+    fun addInAppNotification(
+        context: android.content.Context,
+        title: String,
+        message: String,
+        msgId: String? = null
+    ) {
+        val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
+        val currentSet = prefs.getStringSet("inapp_notifications", emptySet())?.toMutableSet() ?: mutableSetOf()
+        val cleanTitle = title.replace("|", " ")
+        val cleanMessage = message.replace("|", " ")
+        val now = System.currentTimeMillis()
         
-        if (isPushEnabled) {
-            // Send system push notification
-            com.example.ReminderReceiver.showNotification(context, title, message)
-        } else {
-            // Logged-in user has notifications turned off, so store it as in-app notification
-            val currentSet = prefs.getStringSet("inapp_notifications", emptySet())?.toMutableSet() ?: mutableSetOf()
-            val id = java.util.UUID.randomUUID().toString()
-            val timestamp = System.currentTimeMillis()
-            val cleanTitle = title.replace("|", " ")
-            val cleanMessage = message.replace("|", " ")
-            currentSet.add("$id|$cleanTitle|$cleanMessage|$timestamp")
+        val duplicate = currentSet.any { item ->
+            val parts = item.split("|")
+            if (msgId != null && parts.isNotEmpty() && parts[0] == msgId) {
+                true
+            } else if (parts.size >= 4) {
+                val pTitle = parts[1]
+                val pMsg = parts[2]
+                val pTs = parts[3].toLongOrNull() ?: 0L
+                pTitle == cleanTitle && pMsg == cleanMessage && (now - pTs < 15000L)
+            } else false
+        }
+        
+        if (!duplicate) {
+            val id = msgId ?: java.util.UUID.randomUUID().toString()
+            currentSet.add("$id|$cleanTitle|$cleanMessage|$now|false")
             prefs.edit().putStringSet("inapp_notifications", currentSet).apply()
             
-            // Reload into reactive state immediately
+            // Immediately reload state for Compose UI reactive update
             loadInAppNotifications(context)
+
+            // Trigger Toast feedback
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                try {
+                    android.widget.Toast.makeText(context, "🔔 $cleanTitle\n$cleanMessage", android.widget.Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    // Ignore Toast exception if non-UI thread
+                }
+            }
+
+            // Trigger system / push up notification banner if enabled
+            val isPushEnabled = prefs.getBoolean("roster_notifications_enabled", true)
+            if (isPushEnabled) {
+                com.example.ReminderReceiver.showNotification(context, cleanTitle, cleanMessage)
+            }
         }
+    }
+
+    fun markAllNotificationsAsRead(context: android.content.Context) {
+        val prefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
+        val currentSet = prefs.getStringSet("inapp_notifications", emptySet()) ?: emptySet()
+        val updatedSet = currentSet.map { item ->
+            val parts = item.split("|")
+            if (parts.size >= 4) {
+                val id = parts[0]
+                val title = parts[1]
+                val text = parts[2]
+                val ts = parts[3]
+                "$id|$title|$text|$ts|true"
+            } else item
+        }.toSet()
+        prefs.edit().putStringSet("inapp_notifications", updatedSet).apply()
+        loadInAppNotifications(context)
     }
 
     fun clearInAppNotifications(context: android.content.Context) {
@@ -362,6 +532,7 @@ object RosterData {
             for (i in 0 until array.length()) {
                 val empObj = array.getJSONObject(i)
                 val name = empObj.getString("name")
+                if (name.contains("oberfranc", ignoreCase = true)) continue
                 val totalHours = empObj.getString("totalHours")
                 
                 val shiftsMap = mutableMapOf<Int, RosterCell>()
@@ -446,12 +617,15 @@ object RosterData {
             }
         }
         
-        monthlyTopEmployees[m] = topList
-        monthlyBottomEmployees[m] = bottomList
+        val cleanTopList = topList.filter { !it.name.contains("oberfranc", ignoreCase = true) }
+        val cleanBottomList = bottomList.filter { !it.name.contains("oberfranc", ignoreCase = true) }
+
+        monthlyTopEmployees[m] = cleanTopList
+        monthlyBottomEmployees[m] = cleanBottomList
         
         if (m == activeRosterMonth) {
-            topEmployees = topList
-            bottomEmployees = bottomList
+            topEmployees = cleanTopList
+            bottomEmployees = cleanBottomList
         }
     }
 
@@ -496,19 +670,36 @@ object RosterData {
         
         // Sync to Firestore in background
         if (FirebaseSync.isConnected) {
-            FirebaseSync.uploadCurrentRosterToFirestore(context)
+            FirebaseSync.uploadCurrentRosterToFirestore(context, m)
         }
     }
 
-    fun saveCurrentState() {
+    fun getEmployeesForMonth(context: android.content.Context?, monthIndex: Int): Pair<List<RosterEmployee>, List<RosterEmployee>> {
+        if (monthIndex == activeRosterMonth && topEmployees.isNotEmpty()) {
+            return Pair(topEmployees, bottomEmployees)
+        }
+        val top = monthlyTopEmployees[monthIndex]
+        val bottom = monthlyBottomEmployees[monthIndex]
+        if (top != null && bottom != null) {
+            return Pair(top, bottom)
+        }
+        if (context != null) {
+            return ensureMonthLoaded(context, monthIndex)
+        }
+        return Pair(emptyList(), emptyList())
+    }
+
+    fun saveCurrentState(monthIndex: Int = activeRosterMonth) {
         val context = appContext ?: return
-        monthlyTopEmployees[activeRosterMonth] = topEmployees
-        monthlyBottomEmployees[activeRosterMonth] = bottomEmployees
-        saveMonthlyRoster(context, activeRosterMonth)
+        if (monthIndex == activeRosterMonth) {
+            monthlyTopEmployees[activeRosterMonth] = topEmployees
+            monthlyBottomEmployees[activeRosterMonth] = bottomEmployees
+        }
+        saveMonthlyRoster(context, monthIndex)
         
         // Dynamic Sync to Firestore in background
         if (FirebaseSync.isConnected) {
-            FirebaseSync.uploadCurrentRosterToFirestore(context)
+            FirebaseSync.uploadCurrentRosterToFirestore(context, monthIndex)
         }
     }
 
@@ -572,9 +763,19 @@ object RosterData {
         }
     }
 
+    fun ensureMonthLoaded(context: android.content.Context, m: Int): Pair<List<RosterEmployee>, List<RosterEmployee>> {
+        initMonths()
+        if (!monthlyTopEmployees.containsKey(m) || !monthlyBottomEmployees.containsKey(m)) {
+            loadMonthlyRoster(context, m)
+        }
+        val top = monthlyTopEmployees[m] ?: (if (m == activeRosterMonth) topEmployees else emptyList())
+        val bottom = monthlyBottomEmployees[m] ?: (if (m == activeRosterMonth) bottomEmployees else emptyList())
+        return Pair(top, bottom)
+    }
+
     fun switchMonth(monthIndex: Int) {
         initMonths()
-        if (activeRosterMonth == monthIndex) return
+        if (activeRosterMonth == monthIndex && topEmployees.isNotEmpty()) return
         
         // Save current month lists to their respective backups
         val context = appContext
@@ -1223,12 +1424,6 @@ object RosterData {
                 17, "PR", "11,5", 18, "PN", "11,5", 19, "V", "5,0", 21, "D", "11,5", 25, "PR", "11,5", 26, "PN", "11,5",
                 29, "R", "11,5", 30, "N", "11,5"
             ),
-            createEmployee("Oberfranc R.", "168",
-                1, "PR", "11,5", 2, "PN", "11,5", 3, "P", "2,0", 5, "R", "11,5", 6, "N", "11,5",
-                9, "R", "11,5", 10, "N", "11,5", 13, "R", "11,5", 14, "N", "11,5", 17, "PR", "11,5", 18, "PN", "11,5",
-                19, "V", "5,0", 21, "R", "11,5", 22, "N", "11,5", 25, "PR", "11,5", 26, "PN", "11,5",
-                29, "R", "11,5", 30, "N", "11,5"
-            ),
             createEmployee("Polyák A.", "168",
                 2, "R", "11,5", 3, "P", "2,0", 4, "D", "11,5", 5, "D", "11,5", 6, "PR", "11,5", 7, "PN", "11,5",
                 10, "R", "11,5", 11, "N", "11,5", 12, "D", "11,5", 13, "D", "11,5", 14, "PR", "11,5", 15, "PN", "11,5",
@@ -1690,15 +1885,32 @@ object RosterData {
         }
     }
 
+    private fun cleanName(s: String): String {
+        return cleanOfficerName(s)
+    }
+
     // Update specific day shift for employee
     fun updateCell(employeeName: String, day: Int, code: String?, hours: String?) {
-        val inTop = topEmployees.any { it.name == employeeName }
-        val normalizedCode = if (code?.isBlank() == true || code == "NONE" || code == "Voľno") null else code
+        val targetName = employeeName.trim()
+        val cleanTarget = cleanOfficerName(targetName)
+
+        fun matches(empName: String): Boolean {
+            if (empName.trim().equals(targetName, ignoreCase = true)) return true
+            val cleanE = cleanOfficerName(empName)
+            if (cleanE.isNotEmpty() && cleanTarget.isNotEmpty()) {
+                if (cleanE == cleanTarget || cleanE.contains(cleanTarget) || cleanTarget.contains(cleanE)) return true
+            }
+            return false
+        }
+
+        val inTop = topEmployees.any { matches(it.name) }
+        val inBottom = bottomEmployees.any { matches(it.name) }
+        val normalizedCode = if (code.isNullOrBlank() || code.equals("NONE", ignoreCase = true) || code.lowercase().contains("voľno")) null else code
         val normalizedHours = if (normalizedCode == null) null else hours
 
         if (inTop) {
             topEmployees = topEmployees.map { emp ->
-                if (emp.name == employeeName) {
+                if (matches(emp.name)) {
                     val newShifts = emp.shifts.toMutableMap()
                     newShifts[day] = RosterCell(day, normalizedCode, normalizedHours)
                     val calculatedTotal = recalculateHours(newShifts)
@@ -1711,15 +1923,32 @@ object RosterData {
             } else if (activeRosterMonth == 1) {
                 nextMonthTopEmployees = topEmployees
             }
-        } else {
+        } else if (inBottom) {
             bottomEmployees = bottomEmployees.map { emp ->
-                if (emp.name == employeeName) {
+                if (matches(emp.name)) {
                     val newShifts = emp.shifts.toMutableMap()
                     newShifts[day] = RosterCell(day, normalizedCode, normalizedHours)
                     val calculatedTotal = recalculateHours(newShifts)
                     emp.copy(shifts = newShifts, totalHours = calculatedTotal)
                 } else emp
             }
+            monthlyBottomEmployees[activeRosterMonth] = bottomEmployees
+            if (activeRosterMonth == 0) {
+                decemberBottomEmployees = bottomEmployees
+            } else if (activeRosterMonth == 1) {
+                nextMonthBottomEmployees = bottomEmployees
+            }
+        } else {
+            val newShifts = mutableMapOf<Int, RosterCell>()
+            if (normalizedCode != null) {
+                newShifts[day] = RosterCell(day, normalizedCode, normalizedHours)
+            }
+            val newEmp = createEmployee(
+                targetName,
+                recalculateHours(newShifts),
+                *newShifts.flatMap { listOf(it.key.toString(), it.value.code ?: "", it.value.hours ?: "") }.toTypedArray()
+            )
+            bottomEmployees = bottomEmployees + newEmp
             monthlyBottomEmployees[activeRosterMonth] = bottomEmployees
             if (activeRosterMonth == 0) {
                 decemberBottomEmployees = bottomEmployees
@@ -1746,12 +1975,19 @@ object RosterData {
                 topEmployees = loadedTop
                 bottomEmployees = loadedBottom
             } else {
-                if (monthIndex == 0) {
-                    topEmployees = decemberTopEmployees
-                    bottomEmployees = decemberBottomEmployees
+                val context = appContext
+                if (context != null) {
+                    loadMonthlyRoster(context, monthIndex)
+                    topEmployees = monthlyTopEmployees[monthIndex] ?: emptyList()
+                    bottomEmployees = monthlyBottomEmployees[monthIndex] ?: emptyList()
                 } else {
-                    topEmployees = nextMonthTopEmployees
-                    bottomEmployees = nextMonthBottomEmployees
+                    if (monthIndex == 0) {
+                        topEmployees = decemberTopEmployees
+                        bottomEmployees = decemberBottomEmployees
+                    } else {
+                        topEmployees = nextMonthTopEmployees
+                        bottomEmployees = nextMonthBottomEmployees
+                    }
                 }
             }
         }
@@ -2360,18 +2596,6 @@ object RosterData {
         val preview = analyzeRosterFromImage(context, bitmap)
         applyParsedRoster(context, preview)
         return Pair(preview.matchedCount, preview.totalShiftsUpdated)
-    }
-
-    private fun cleanName(name: String): String {
-        return name.lowercase()
-            .replace("mgr.", "")
-            .replace("bc.", "")
-            .replace("phdr.", "")
-            .replace("ing.", "")
-            .replace("mudr.", "")
-            .replace("judr.", "")
-            .trim()
-            .replace("\\s+".toRegex(), " ")
     }
 }
 

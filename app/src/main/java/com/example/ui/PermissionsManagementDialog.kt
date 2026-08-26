@@ -30,10 +30,7 @@ fun PermissionsManagementDialog(
     val prefs = remember { context.getSharedPreferences("shift_prefs", Context.MODE_PRIVATE) }
 
     val allEmployees = remember {
-        (RosterData.topEmployees.map { it.name } + RosterData.bottomEmployees.map { it.name })
-            .distinct()
-            .filter { it.isNotBlank() }
-            .sorted()
+        RosterData.getAllKnownOfficerNames(context)
     }
 
     var searchQuery by remember { mutableStateOf("") }

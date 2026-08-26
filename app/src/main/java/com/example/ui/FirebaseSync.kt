@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.messaging.FirebaseMessaging
@@ -105,14 +106,36 @@ object FirebaseSync {
 
             db = FirebaseFirestore.getInstance(app)
             
-            // Subscribe for FCM messages safely
             try {
-                FirebaseMessaging.getInstance().subscribeToTopic("roster_updates")
-                    .addOnFailureListener { e ->
-                        Log.w(TAG, "FCM topic subscription not available or reached limit: ${e.message}")
-                    }
-            } catch (e: Exception) {
-                Log.w(TAG, "FCM subscription error", e)
+                val auth = FirebaseAuth.getInstance(app)
+                if (auth.currentUser == null) {
+                    auth.signInAnonymously()
+                        .addOnSuccessListener {
+                            Log.d(TAG, "Successfully signed in anonymously to FirebaseAuth")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.w(TAG, "FirebaseAuth anonymous sign in failed", e)
+                        }
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "FirebaseAuth initialization skipped", t)
+            }
+            
+            // Disable auto-init for FCM unless valid messagingSenderId is present
+            try {
+                val fcm = FirebaseMessaging.getInstance()
+                val hasSenderId = messagingSenderId.trim().isNotEmpty() && messagingSenderId.trim() != DEFAULT_MESSAGING_SENDER_ID
+                fcm.isAutoInitEnabled = hasSenderId
+                if (hasSenderId) {
+                    fcm.subscribeToTopic("roster_updates")
+                        .addOnCompleteListener { task ->
+                            if (!task.isSuccessful) {
+                                Log.w(TAG, "FCM topic subscription skipped: ${task.exception?.message}")
+                            }
+                        }
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "FCM initialization skipped", t)
             }
 
             // Save settings to SharedPreferences
@@ -157,6 +180,9 @@ object FirebaseSync {
         activeListener?.remove()
         activeListener = null
 
+        if (db == null) {
+            init(context)
+        }
         val localDb = db ?: return
         val currentMonth = RosterData.activeRosterMonth
         val monthDocId = "month_2026_${String.format("%02d", currentMonth)}"
@@ -217,28 +243,35 @@ object FirebaseSync {
                         } else null
                     } ?: emptyList()
 
-                    // Detect changes, synchronize with personal calendar database, and prompt notify
-                    detectAndProcessChanges(context, currentMonth, parsedTop, parsedBottom)
+                    val prefs = context.getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+                    val oldTopSaved = prefs.getString("roster_month_${currentMonth}_top_employees", null)
+                    val oldBottomSaved = prefs.getString("roster_month_${currentMonth}_bottom_employees", null)
+
+                    val oldTop = if (oldTopSaved != null) RosterData.deserializeEmployees(oldTopSaved) else (RosterData.monthlyTopEmployees[currentMonth] ?: emptyList())
+                    val oldBottom = if (oldBottomSaved != null) RosterData.deserializeEmployees(oldBottomSaved) else (RosterData.monthlyBottomEmployees[currentMonth] ?: emptyList())
 
                     if (topRawList != null) {
                         RosterData.monthlyTopEmployees[currentMonth] = parsedTop
-                        RosterData.topEmployees = parsedTop
+                        if (currentMonth == RosterData.activeRosterMonth) {
+                            RosterData.topEmployees = parsedTop
+                        }
                         
                         val serializedTop = RosterData.serializeEmployees(parsedTop)
-                        context.getSharedPreferences("shift_prefs", Context.MODE_PRIVATE).edit()
-                            .putString("roster_month_${currentMonth}_top_employees", serializedTop)
-                            .apply()
+                        prefs.edit().putString("roster_month_${currentMonth}_top_employees", serializedTop).apply()
                     }
 
                     if (bottomRawList != null) {
                         RosterData.monthlyBottomEmployees[currentMonth] = parsedBottom
-                        RosterData.bottomEmployees = parsedBottom
+                        if (currentMonth == RosterData.activeRosterMonth) {
+                            RosterData.bottomEmployees = parsedBottom
+                        }
                         
                         val serializedBottom = RosterData.serializeEmployees(parsedBottom)
-                        context.getSharedPreferences("shift_prefs", Context.MODE_PRIVATE).edit()
-                            .putString("roster_month_${currentMonth}_bottom_employees", serializedBottom)
-                            .apply()
+                        prefs.edit().putString("roster_month_${currentMonth}_bottom_employees", serializedBottom).apply()
                     }
+
+                    // Detect changes, synchronize with personal calendar database, and prompt notify
+                    detectAndProcessChanges(context, currentMonth, parsedTop, parsedBottom, oldTop, oldBottom, oldTopSaved != null && oldBottomSaved != null)
                     
                     Log.d(TAG, "Roster loaded and merged successfully for $monthDocId")
                 } else {
@@ -276,13 +309,18 @@ object FirebaseSync {
         return RosterEmployee(name, totalHours, shiftsMap)
     }
 
-    fun uploadCurrentRosterToFirestore(context: Context): Boolean {
+    fun uploadCurrentRosterToFirestore(context: Context, monthIndex: Int = RosterData.activeRosterMonth): Boolean {
+        if (db == null) {
+            init(context)
+        }
         val localDb = db ?: return false
-        val currentMonth = RosterData.activeRosterMonth
+        val currentMonth = monthIndex
         val monthDocId = "month_2026_${String.format("%02d", currentMonth)}"
 
-        val topEmployeesToSend = convertRosterToMapList(RosterData.topEmployees)
-        val bottomEmployeesToSend = convertRosterToMapList(RosterData.bottomEmployees)
+        val (topList, bottomList) = RosterData.getEmployeesForMonth(context, currentMonth)
+
+        val topEmployeesToSend = convertRosterToMapList(topList)
+        val bottomEmployeesToSend = convertRosterToMapList(bottomList)
 
         val dataPayload = mapOf(
             "monthIndex" to currentMonth,
@@ -297,17 +335,17 @@ object FirebaseSync {
         localDb.collection("rosters").document(monthDocId)
             .set(dataPayload)
             .addOnSuccessListener {
-                Log.d(TAG, "Successfully uploaded roster to Firestore")
+                Log.d(TAG, "Successfully uploaded roster to Firestore for month $currentMonth")
                 
                 // Trigger push notification request so other clients are updated
                 triggerPushNotificationRequest(
                     localDb, 
                     "Aktualizácia rozpisu", 
-                    "Rozpis na mesiac bol upravený oprávnenou osobou."
+                    "Rozpis na mesiac bol upravený."
                 )
             }
             .addOnFailureListener {
-                Log.e(TAG, "Failed to upload roster", it)
+                Log.e(TAG, "Failed to upload roster for month $currentMonth", it)
             }
 
         return true
@@ -317,17 +355,15 @@ object FirebaseSync {
         context: Context,
         currentMonth: Int,
         newTop: List<RosterEmployee>,
-        newBottom: List<RosterEmployee>
+        newBottom: List<RosterEmployee>,
+        oldTop: List<RosterEmployee>,
+        oldBottom: List<RosterEmployee>,
+        hasPreviousSavedState: Boolean
     ) {
         val prefs = context.getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        val oldTopSaved = prefs.getString("roster_month_${currentMonth}_top_employees", null)
-        val oldBottomSaved = prefs.getString("roster_month_${currentMonth}_bottom_employees", null)
-
-        val oldTop = if (oldTopSaved != null) RosterData.deserializeEmployees(oldTopSaved) else (RosterData.monthlyTopEmployees[currentMonth] ?: emptyList())
-        val oldBottom = if (oldBottomSaved != null) RosterData.deserializeEmployees(oldBottomSaved) else (RosterData.monthlyBottomEmployees[currentMonth] ?: emptyList())
 
         // 1. General notification: check if ANY cell/employee is edited or added across the whole roster
-        if (oldTopSaved != null && oldBottomSaved != null) {
+        if (hasPreviousSavedState) {
             var anyRosterChanged = false
             val oldCombinedList = oldTop + oldBottom
             val newCombinedList = newTop + newBottom
@@ -379,14 +415,15 @@ object FirebaseSync {
         }
 
         // 2. Personal notification: specific to the logged-in user
-        val userName = prefs.getString("user_name", "") ?: ""
+        val loggedInUser = prefs.getString("logged_in_user_name", "") ?: ""
+        val userName = if (loggedInUser.isNotBlank()) loggedInUser else (prefs.getString("user_name", "") ?: "")
         if (userName.isBlank()) return
 
         val oldCombined = oldTop + oldBottom
         val newCombined = newTop + newBottom
 
-        val oldEmp = oldCombined.find { it.name.trim().equals(userName.trim(), ignoreCase = true) }
-        val newEmp = newCombined.find { it.name.trim().equals(userName.trim(), ignoreCase = true) }
+        val oldEmp = oldCombined.find { RosterData.isSameOfficer(it.name, userName) }
+        val newEmp = newCombined.find { RosterData.isSameOfficer(it.name, userName) }
 
         if (newEmp != null) {
             val ym = RosterData.getYearMonthForIndex(currentMonth)
@@ -403,66 +440,12 @@ object FirebaseSync {
                 val newHours = newCell.hours
 
                 if (oldCode != newCode || oldHours != newHours) {
-                    val savedActiveMonth = RosterData.activeRosterMonth
-                    RosterData.activeRosterMonth = currentMonth
-                    RosterData.onCellUpdatedExternal?.invoke(newEmp.name, day, newCode, newHours)
-                    RosterData.activeRosterMonth = savedActiveMonth
-
-                    if (oldEmp != null && oldTopSaved != null && oldBottomSaved != null) {
-                        changedDays.add(day)
-                    }
+                    changedDays.add(day)
                 }
             }
 
-            if (changedDays.isNotEmpty()) {
-                val monthName = when (currentMonth) {
-                    0 -> "December"
-                    1 -> "Január"
-                    2 -> "Február"
-                    3 -> "Marec"
-                    4 -> "Apríl"
-                    5 -> "Máj"
-                    6 -> "Jún"
-                    7 -> "Júl"
-                    8 -> "August"
-                    9 -> "September"
-                    10 -> "Október"
-                    11 -> "November"
-                    12 -> "December"
-                    else -> "Mesiac"
-                }
-                val yearText = if (currentMonth == 0) "2025" else "2026"
-                val monthDot = if (currentMonth == 0) "12" else currentMonth.toString()
-                val titleText = "Zmena rozpisu: $monthName $yearText"
-
-                val bodyText = if (changedDays.size == 1) {
-                    val day = changedDays.first()
-                    val newCell = newEmp.shifts[day] ?: RosterCell(day, null, null)
-                    val newCode = newCell.code
-                    val newHours = newCell.hours
-                    val codeDesc = when (newCode) {
-                        "R", "SR" -> "Ranná služba"
-                        "PR" -> "PCO ranná (PR)"
-                        "N", "SN" -> "Nočná služba"
-                        "PN" -> "PCO nočná (PN)"
-                        "D" -> "Dovolenka"
-                        "CH" -> "Choroba"
-                        "KZ", "KZS", "KZV", "KZVS" -> "Kĺzavé voľno"
-                        "Par" -> "Paragraf"
-                        "P" -> "Poverenie"
-                        "V" -> "Vzdelávanie"
-                        null, "Voľno" -> "Voľno"
-                        else -> newCode
-                    }
-                    val hrsDesc = if (newHours != null) " ($newHours hod)" else ""
-                    "Vaša služba dňa ${day}.${monthDot}. bola zmenená na: $codeDesc$hrsDesc."
-                } else {
-                    val daysString = changedDays.sorted().map { "$it.$monthDot." }.joinToString(", ")
-                    "Vaše služby pre dni ($daysString) boli upravené."
-                }
-
-                RosterData.triggerRosterNotification(context, titleText, bodyText)
-            }
+            // Always synchronize roster to Šichtér for logged-in user
+            RosterData.syncRosterToSichereForUser(userName, currentMonth, context)
         }
     }
 

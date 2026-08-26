@@ -34,6 +34,7 @@ class ReminderReceiver : BroadcastReceiver() {
             // Intent to launch MainActivity when clicking the notification
             val mainIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("open_notifications", true)
             }
             val pendingIntent = PendingIntent.getActivity(
                 context,
@@ -225,6 +226,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 createNotificationChannel(context)
                 val mainIntent = Intent(context, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra("open_notifications", true)
                 }
                 val pendingIntent = PendingIntent.getActivity(
                     context,
@@ -239,6 +241,8 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setContentText(message)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(message))
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_EVENT)
+                    .setDefaults(NotificationCompat.DEFAULT_ALL)
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
 

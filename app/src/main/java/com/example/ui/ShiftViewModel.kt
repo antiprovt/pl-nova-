@@ -197,7 +197,33 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
         val cb = RosterData.onCellUpdatedExternal
         RosterData.onCellUpdatedExternal = null
         RosterData.updateCellForMonth(monthIndex, userName, day, code, hoursStr)
+        RosterData.saveCurrentState(monthIndex)
         RosterData.onCellUpdatedExternal = cb
+
+        val context = RosterData.appContext
+        if (context != null && userName.isNotBlank()) {
+            val dayStr = "${date.dayOfMonth}.${date.monthValue}.${date.year}"
+            val codeDesc = when (type) {
+                "MORNING" -> "Ranná (R)"
+                "MORNING_PR" -> "PCO ranná (PR)"
+                "NIGHT" -> "Nočná (N)"
+                "NIGHT_PN" -> "PCO nočná (PN)"
+                "VACATION" -> "Dovolenka (D)"
+                "SICK" -> "Choroba (CH)"
+                "KZ" -> "Kĺzavé voľno (KZ)"
+                "Par" -> "Paragraf (Par)"
+                "MEETING" -> "Poverenie (P)"
+                "TRAINING" -> "Vzdelávanie (V)"
+                else -> "Voľno"
+            }
+            RosterData.triggerRosterNotification(
+                context = context,
+                title = "Úprava zmeny: $userName",
+                message = "Príslušník $userName si upravil smenu dňa $dayStr ($codeDesc).",
+                targetOfficer = null,
+                sender = userName
+            )
+        }
     }
 
     fun setShiftType(date: LocalDate, type: String, length: Int = 8, syncToRosterEnabled: Boolean = true) {
@@ -279,55 +305,67 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
         }
     }
 
-    // Quick templates - fill remaining month days to the end of the year
+    // Quick templates - fill month days in rotation sequence
     fun applyTemplateForRemainingDays(shiftSequence: List<String>, length: Int = 8) {
         if (_sharedPreviewShifts.value != null) return
         val month = _selectedMonth.value
+        val daysInMonth = month.lengthOfMonth()
         val currentShifts = allShiftDays.value
+        val selDate = _selectedDate.value
+
         viewModelScope.launch {
             try {
-                // Find first day that already has a shift in the current month matching the sequence
-                var startDayNum: Int? = null
-                var startShiftType: String? = null
-                
-                val daysInMonth = month.lengthOfMonth()
-                for (dayNum in 1..daysInMonth) {
-                    val dateStr = month.atDay(dayNum).toString()
-                    val existing = currentShifts.find { it.date == dateStr }
-                    if (existing != null && existing.shiftType != "NONE" && existing.shiftType in shiftSequence) {
-                        startDayNum = dayNum
-                        startShiftType = existing.shiftType
-                        break
+                var anchorDayNum: Int? = null
+                var anchorShiftType: String? = null
+
+                // First check if selected date in current month has a matching shift
+                if (selDate != null && selDate.year == month.year && selDate.monthValue == month.monthValue) {
+                    val existingSel = currentShifts.find { it.date == selDate.toString() }
+                    if (existingSel != null && existingSel.shiftType != "NONE" && existingSel.shiftType in shiftSequence) {
+                        anchorDayNum = selDate.dayOfMonth
+                        anchorShiftType = existingSel.shiftType
                     }
                 }
-                
-                val finalStartDayNum = startDayNum ?: 1
-                val finalStartShiftType = startShiftType ?: shiftSequence.firstOrNull { it != "NONE" } ?: "NONE"
-                val startIndex = shiftSequence.indexOf(finalStartShiftType).let { if (it == -1) 0 else it }
-                
-                val startDate = month.atDay(finalStartDayNum)
-                val endDate = LocalDate.of(month.year, 12, 31)
-                
+
+                // Otherwise find the first existing shift in current month matching sequence
+                if (anchorShiftType == null) {
+                    for (dayNum in 1..daysInMonth) {
+                        val dateStr = month.atDay(dayNum).toString()
+                        val existing = currentShifts.find { it.date == dateStr }
+                        if (existing != null && existing.shiftType != "NONE" && existing.shiftType in shiftSequence) {
+                            anchorDayNum = dayNum
+                            anchorShiftType = existing.shiftType
+                            break
+                        }
+                    }
+                }
+
+                val finalAnchorDayNum = anchorDayNum ?: 1
+                val finalAnchorShiftType = anchorShiftType ?: shiftSequence.firstOrNull { it != "NONE" } ?: "NIGHT"
+                val anchorIndex = shiftSequence.indexOf(finalAnchorShiftType).let { if (it == -1) 0 else it }
+                val seqSize = shiftSequence.size
+
                 val toInsert = mutableListOf<ShiftDay>()
-                var currentDate = startDate
-                while (!currentDate.isAfter(endDate)) {
-                    val dateStr = currentDate.toString()
-                    val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(startDate, currentDate)
-                    val seqIdx = (((startIndex + daysBetween) % shiftSequence.size).toInt() + shiftSequence.size) % shiftSequence.size
+                for (dayNum in 1..daysInMonth) {
+                    val dateObj = month.atDay(dayNum)
+                    val dateStr = dateObj.toString()
+
+                    val daysFromAnchor = dayNum - finalAnchorDayNum
+                    val seqIdx = (((anchorIndex + daysFromAnchor) % seqSize) + seqSize) % seqSize
                     val type = shiftSequence[seqIdx]
-                    
+
                     val existing = currentShifts.find { it.date == dateStr }
-                    if (existing == null || existing.shiftType == "NONE") {
-                        val updated = existing?.copy(shiftType = type, shiftLength = length)
-                            ?: ShiftDay(date = dateStr, shiftType = type, shiftLength = length)
-                        toInsert.add(updated)
-                        syncToRoster(currentDate, type, length)
-                    }
-                    currentDate = currentDate.plusDays(1)
+                    val updated = existing?.copy(shiftType = type, shiftLength = length)
+                        ?: ShiftDay(date = dateStr, shiftType = type, shiftLength = length)
+                    toInsert.add(updated)
+                    syncToRoster(dateObj, type, length)
                 }
+
                 if (toInsert.isNotEmpty()) {
                     repository.insertShiftDays(toInsert)
                 }
+
+                com.example.ui.RosterData.saveCurrentState()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -340,22 +378,37 @@ class ShiftViewModel(private val repository: ShiftRepository) : ViewModel() {
         val month = _selectedMonth.value
         val daysInMonth = month.lengthOfMonth()
         val currentShifts = allShiftDays.value
+
         viewModelScope.launch {
             try {
                 val toInsert = mutableListOf<ShiftDay>()
                 for (dayNum in 1..daysInMonth) {
-                    val dateStr = month.atDay(dayNum).toString()
+                    val dateObj = month.atDay(dayNum)
+                    val dateStr = dateObj.toString()
                     val existing = currentShifts.find { it.date == dateStr }
-                    if (existing != null && (existing.shiftType != "NONE" || existing.note != null || existing.reminderText != null || existing.overtimeHours != 0)) {
-                        toInsert.add(
-                            existing.copy(shiftType = "NONE", shiftLength = 8, note = null, reminderText = null, overtimeHours = 0)
-                        )
-                        syncToRoster(month.atDay(dayNum), "NONE", 8)
-                    }
+                    val updated = existing?.copy(
+                        shiftType = "NONE",
+                        shiftLength = 8,
+                        note = null,
+                        reminderText = null,
+                        overtimeHours = 0
+                    ) ?: ShiftDay(
+                        date = dateStr,
+                        shiftType = "NONE",
+                        shiftLength = 8,
+                        note = null,
+                        reminderText = null,
+                        overtimeHours = 0
+                    )
+                    toInsert.add(updated)
+                    syncToRoster(dateObj, "NONE", 8)
                 }
+
                 if (toInsert.isNotEmpty()) {
                     repository.insertShiftDays(toInsert)
                 }
+
+                com.example.ui.RosterData.saveCurrentState()
             } catch (e: Exception) {
                 e.printStackTrace()
             }

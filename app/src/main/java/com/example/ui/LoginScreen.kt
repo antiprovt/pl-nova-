@@ -30,6 +30,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+private fun normalizeLoginName(name: String): String {
+    return name.replace(" ", "").replace(".", "").replace(",", "").trim().lowercase()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -39,7 +43,7 @@ fun LoginScreen(
     val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
 
     val employeeNames = remember {
-        (RosterData.topEmployees.map { it.name } + RosterData.bottomEmployees.map { it.name }).distinct()
+        RosterData.getAllKnownOfficerNames(context)
     }
 
     var selectedName by remember { mutableStateOf("") }
@@ -51,23 +55,26 @@ fun LoginScreen(
     var sentCodeDialogValue by remember { mutableStateOf<String?>(null) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
 
-    val isRiegerT = remember(selectedName) {
-        val trimmed = selectedName.trim()
-        trimmed.equals("RiegerT", ignoreCase = true) || trimmed.equals("Rieger T.", ignoreCase = true)
+    val normSelected = remember(selectedName) { normalizeLoginName(selectedName) }
+
+    val isRiegerT = remember(normSelected) {
+        normSelected == "riegert"
     }
 
-    val isAdmin = remember(selectedName) {
-        selectedName.trim().equals("admin", ignoreCase = true)
+    val isAdmin = remember(normSelected) {
+        normSelected == "admin"
     }
 
-    val isTestUser = remember(selectedName) {
-        selectedName.trim().equals("test", ignoreCase = true)
+    val isTestUser = remember(normSelected) {
+        normSelected == "test"
     }
 
-    val isNameInRoster = remember(selectedName) {
-        val trimmed = selectedName.trim()
-        employeeNames.any { it.trim().equals(trimmed, ignoreCase = true) }
+    val matchedRosterEmployee = remember(normSelected, employeeNames) {
+        if (normSelected.isBlank()) null
+        else employeeNames.find { normalizeLoginName(it) == normSelected }
     }
+
+    val isNameInRoster = matchedRosterEmployee != null
 
     val showEmailOption = isNameInRoster && !isRiegerT && !isAdmin && !isTestUser
     val isSpecialUser = isRiegerT || isAdmin || isTestUser
@@ -233,7 +240,7 @@ fun LoginScreen(
                                 selectedName = input
                                 errorMessage = null
                             },
-                            placeholder = { Text("Zadajte presné meno") },
+                            placeholder = { Text("Napr. NemecM alebo Nemec M.") },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Person,
@@ -372,15 +379,15 @@ fun LoginScreen(
                     // Login Action Primary CTA
                     Button(
                         onClick = {
-                            val nameClean = selectedName.trim()
-                            if (nameClean.isBlank()) {
+                            val normName = normalizeLoginName(selectedName)
+                            if (normName.isBlank()) {
                                 errorMessage = "Najprv zadajte meno."
                                 return@Button
                             }
 
-                            if (nameClean.equals("RiegerT", ignoreCase = true) || nameClean.equals("Rieger T.", ignoreCase = true)) {
+                            if (normName == "riegert") {
                                 if (passwordInput == "745325") {
-                                    val finalName = employeeNames.find { it.contains("Rieger", ignoreCase = true) } ?: "Rieger T."
+                                    val finalName = employeeNames.find { normalizeLoginName(it) == "riegert" } ?: "Rieger T."
                                     prefs.edit()
                                         .putBoolean("is_logged_in", true)
                                         .putString("logged_in_user_name", finalName)
@@ -391,7 +398,7 @@ fun LoginScreen(
                                 } else {
                                     errorMessage = "Nesprávne heslo pre RiegerT."
                                 }
-                            } else if (nameClean.equals("admin", ignoreCase = true)) {
+                            } else if (normName == "admin") {
                                 if (passwordInput == "admin") {
                                     val finalName = "admin"
                                     prefs.edit()
@@ -404,7 +411,7 @@ fun LoginScreen(
                                 } else {
                                     errorMessage = "Nesprávne heslo pre admina."
                                 }
-                            } else if (nameClean.equals("test", ignoreCase = true)) {
+                            } else if (normName == "test") {
                                 if (passwordInput == "test") {
                                     val finalName = "test"
                                     prefs.edit()
@@ -418,7 +425,7 @@ fun LoginScreen(
                                     errorMessage = "Nesprávne heslo pre test."
                                 }
                             } else {
-                                val matchedEmployee = employeeNames.find { it.trim().equals(nameClean, ignoreCase = true) }
+                                val matchedEmployee = matchedRosterEmployee
                                 if (matchedEmployee == null) {
                                     errorMessage = "Zadané meno sa v rozpise nenachádza."
                                 } else {
@@ -496,9 +503,9 @@ fun LoginScreen(
                 } else {
                     Button(
                         onClick = {
-                            val nameClean = forgotName.trim()
+                            val normForgot = normalizeLoginName(forgotName)
                             val emailClean = forgotEmail.trim()
-                            if (nameClean.isBlank()) {
+                            if (normForgot.isBlank()) {
                                 forgotError = "Najprv zadajte meno."
                                 return@Button
                             }
@@ -507,29 +514,28 @@ fun LoginScreen(
                                 return@Button
                             }
 
-                            // Check if name is valid
-                            val isFound = nameClean.lowercase() == "admin" || 
-                                          nameClean.lowercase() == "riegert" || 
-                                          nameClean.lowercase() == "rieger t." ||
-                                          employeeNames.any { it.trim().equals(nameClean, ignoreCase = true) }
+                            val matchedForgotEmp = if (normForgot == "admin") "admin"
+                                else if (normForgot == "riegert") (employeeNames.find { normalizeLoginName(it) == "riegert" } ?: "Rieger T.")
+                                else if (normForgot == "test") "test"
+                                else employeeNames.find { normalizeLoginName(it) == normForgot }
 
-                            if (!isFound) {
+                            if (matchedForgotEmp == null) {
                                 forgotError = "Zadané meno sa v rozpise nenachádza."
                                 return@Button
                             }
 
                             forgotError = null
                             // Generate new numeric password for non-special users, or retrieve theirs
-                            val newPass = if (nameClean.lowercase() == "admin") {
+                            val newPass = if (normForgot == "admin") {
                                 "admin"
-                            } else if (nameClean.lowercase() == "riegert" || nameClean.lowercase() == "rieger t.") {
+                            } else if (normForgot == "riegert") {
                                 "745325"
                             } else {
                                 (100000..999999).random().toString()
                             }
                             
                             // If it's a regular user, save this as the new password in SharedPreferences
-                            if (nameClean.lowercase() != "admin" && nameClean.lowercase() != "riegert" && nameClean.lowercase() != "rieger t.") {
+                            if (normForgot != "admin" && normForgot != "riegert" && normForgot != "test") {
                                 prefs.edit().putString("roster_login_password", newPass).apply()
                             }
                             
@@ -544,7 +550,7 @@ fun LoginScreen(
                                     putExtra(android.content.Intent.EXTRA_SUBJECT, "Nové heslo pre rozpis zmien")
                                     putExtra(
                                         android.content.Intent.EXTRA_TEXT, 
-                                        "Ahoj,\n\ntvoje nové heslo pre prihlásenie pod menom $nameClean je: $newPass\n\nTýmto heslom sa teraz môžeš prihlásiť do aplikácie."
+                                        "Ahoj,\n\ntvoje nové heslo pre prihlásenie pod menom $matchedForgotEmp je: $newPass\n\nTýmto heslom sa teraz môžeš prihlásiť do aplikácie."
                                     )
                                 }
                                 context.startActivity(android.content.Intent.createChooser(emailIntent, "Odoslať nové heslo..."))

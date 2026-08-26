@@ -24,6 +24,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -105,8 +106,23 @@ private fun safeLocalDateTimeNow(): java.time.LocalDateTime {
 }
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        var openNotificationCenterTrigger = mutableStateOf(false)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("open_notifications", false)) {
+            openNotificationCenterTrigger.value = true
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent?.getBooleanExtra("open_notifications", false) == true) {
+            openNotificationCenterTrigger.value = true
+        }
         
         try {
             ReminderReceiver.createNotificationChannel(this)
@@ -166,7 +182,13 @@ class MainActivity : ComponentActivity() {
                     if (isLoggedIn) {
                         ShiftAppScreen(
                             viewModel = viewModel,
-                            onLogout = { isLoggedIn = false }
+                            onLogout = {
+                                prefs.edit()
+                                    .putBoolean("is_logged_in", false)
+                                    .remove("logged_in_user_name")
+                                    .apply()
+                                isLoggedIn = false
+                            }
                         )
                     } else {
                         LoginScreen(
@@ -362,7 +384,7 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
     var userName by remember { mutableStateOf(prefs.getString("user_name", "") ?: "") }
     var showPermissionsDialog by remember { mutableStateOf(false) }
 
-    val loggedInUser = remember { prefs.getString("logged_in_user_name", "") ?: "" }
+    val loggedInUser = prefs.getString("logged_in_user_name", "") ?: ""
     val activeUserName = if (loggedInUser.isNotBlank()) loggedInUser else userName
 
     var hasRosterAccess by remember(activeUserName) {
@@ -379,6 +401,120 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
         }
     }
 
+    val isAdminOrPoverena = remember(activeUserName, showPermissionsDialog) {
+        com.example.ui.RosterPermissions.isAdminOrPoverena(activeUserName, prefs)
+    }
+
+    var selectedOfficerForEdit by remember { mutableStateOf<String?>(null) }
+    var officerShiftDraftMap by remember { mutableStateOf<Map<String, ShiftDay>>(emptyMap()) }
+    var officerOriginalShiftsMap by remember { mutableStateOf<Map<String, ShiftDay>>(emptyMap()) }
+    var hasOfficerUnsavedChanges by remember { mutableStateOf(false) }
+
+    LaunchedEffect(
+        selectedOfficerForEdit,
+        selectedMonth,
+        com.example.ui.RosterData.topEmployees,
+        com.example.ui.RosterData.bottomEmployees,
+        com.example.ui.RosterData.activeRosterMonth
+    ) {
+        if (selectedOfficerForEdit != null) {
+            val officerName = selectedOfficerForEdit!!
+            val mIdx = when {
+                selectedMonth.year == 2025 && selectedMonth.monthValue == 12 -> 0
+                selectedMonth.year == 2026 -> selectedMonth.monthValue.coerceIn(1, 12)
+                else -> 1
+            }
+            
+            // Explicitly load monthly roster and switch active month in RosterData
+            com.example.ui.RosterData.switchMonth(mIdx)
+            val (topList, bottomList) = com.example.ui.RosterData.ensureMonthLoaded(context, mIdx)
+            
+            val cleanOfficer = com.example.ui.RosterData.cleanOfficerName(officerName)
+
+            val monthEmps = topList + bottomList
+            var emp = monthEmps.find { 
+                it.name.trim().equals(officerName.trim(), ignoreCase = true) || 
+                com.example.ui.RosterData.isSameOfficer(it.name, officerName)
+            }
+            if (emp == null) {
+                val (topM, bottomM) = com.example.ui.RosterData.getEmployeesForMonth(context, mIdx)
+                emp = (topM + bottomM).find {
+                    it.name.trim().equals(officerName.trim(), ignoreCase = true) || 
+                    com.example.ui.RosterData.isSameOfficer(it.name, officerName)
+                }
+            }
+            if (emp == null) {
+                val fallbackList = com.example.ui.RosterData.monthlyTopEmployees.values.flatten() +
+                                   com.example.ui.RosterData.monthlyBottomEmployees.values.flatten()
+                emp = fallbackList.find {
+                    it.name.trim().equals(officerName.trim(), ignoreCase = true) || 
+                    com.example.ui.RosterData.isSameOfficer(it.name, officerName)
+                }
+            }
+
+            if (!hasOfficerUnsavedChanges) {
+                val draft = mutableMapOf<String, ShiftDay>()
+                val daysInM = selectedMonth.lengthOfMonth()
+                for (d in 1..daysInM) {
+                    val dStr = selectedMonth.atDay(d).toString()
+                    val cell = emp?.shifts?.get(d)
+                    val codeRaw = cell?.code?.trim() ?: ""
+                    val codeUpper = codeRaw.uppercase()
+
+                    if (codeRaw.isBlank() || codeUpper == "NONE" || codeUpper == "VOĽNO") {
+                        draft[dStr] = ShiftDay(date = dStr, shiftType = "NONE", shiftLength = 8)
+                    } else {
+                        val hrsStr = cell?.hours ?: ""
+                        val len = when {
+                            hrsStr.contains("7") || hrsStr.contains("8") -> 8
+                            hrsStr.contains("11") || hrsStr.contains("12") -> 12
+                            else -> hrsStr.replace(",", ".").toDoubleOrNull()?.toInt() ?: (if (codeUpper in setOf("N", "SN", "PN")) 12 else 8)
+                        }
+                        val shiftType = when (codeUpper) {
+                            "R", "SR" -> "MORNING"
+                            "PR" -> "MORNING_PR"
+                            "N", "SN" -> "NIGHT"
+                            "PN" -> "NIGHT_PN"
+                            "D" -> "VACATION"
+                            "CH" -> "SICK"
+                            "KZ", "KZS", "KZV", "KZVS" -> "KZ"
+                            "PAR", "PARAGRAF" -> "Par"
+                            "P" -> "MEETING"
+                            "V" -> "TRAINING"
+                            else -> when {
+                                codeUpper.startsWith("R") -> "MORNING"
+                                codeUpper.startsWith("N") -> "NIGHT"
+                                codeUpper.startsWith("P") -> "MORNING_PR"
+                                else -> codeRaw
+                            }
+                        }
+                        draft[dStr] = ShiftDay(date = dStr, shiftType = shiftType, shiftLength = len)
+                    }
+                }
+                officerOriginalShiftsMap = draft.toMap()
+                officerShiftDraftMap = draft
+            }
+        }
+    }
+
+    val effectiveShiftDays: List<ShiftDay> = if (selectedOfficerForEdit != null) {
+        val daysInM = selectedMonth.lengthOfMonth()
+        (1..daysInM).map { d ->
+            val dStr = selectedMonth.atDay(d).toString()
+            officerShiftDraftMap[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = 8)
+        }
+    } else {
+        allShiftDays
+    }
+
+    val effectiveCurrentShift: ShiftDay? = if (selectedOfficerForEdit != null) {
+        if (selectedDate != null) {
+            officerShiftDraftMap[selectedDate.toString()] ?: ShiftDay(date = selectedDate.toString(), shiftType = "NONE", shiftLength = defaultShiftLength)
+        } else null
+    } else {
+        currentShift
+    }
+
     var tariffSalary by remember { mutableStateOf(prefs.getFloat("tariff_salary", 936.50f)) }
     var personalAllowance by remember { mutableStateOf(prefs.getFloat("personal_allowance", 380.0f)) }
     var shiftAllowance by remember { mutableStateOf(prefs.getFloat("shift_allowance", 40.0f)) }
@@ -390,57 +526,87 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
     var showManageMessagesDialog by remember { mutableStateOf(false) }
     var shownPendingMessageDialog by remember { mutableStateOf<Map<String, Any>?>(null) }
 
-    LaunchedEffect(com.example.ui.FirebaseSync.isConnected, userName) {
-        if (com.example.ui.FirebaseSync.isConnected && userName.isNotBlank()) {
-            val firestoreDb = try {
-                com.google.firebase.firestore.FirebaseFirestore.getInstance()
-            } catch(e: Exception) {
-                null
-            }
-            if (firestoreDb != null) {
-                firestoreDb.collection("messages")
-                    .addSnapshotListener { snapshot, error ->
-                        if (error != null) return@addSnapshotListener
-                        if (snapshot != null) {
-                            val isTopEmployee = com.example.ui.RosterData.topEmployees.any { 
-                                it.name.trim().equals(userName.trim(), ignoreCase = true) 
-                            }
-                            val targetShift = if (isTopEmployee) "top" else "bottom"
+    val triggerOpenNotifications by MainActivity.openNotificationCenterTrigger
+    LaunchedEffect(triggerOpenNotifications) {
+        if (triggerOpenNotifications) {
+            com.example.ui.RosterData.markAllNotificationsAsRead(context)
+            showNotificationsDialog = true
+            MainActivity.openNotificationCenterTrigger.value = false
+        }
+    }
+
+    LaunchedEffect(Unit, activeUserName) {
+        com.example.ui.RosterData.loadInAppNotifications(context)
+    }
+
+    LaunchedEffect(Unit, activeUserName) {
+        val firestoreDb = try {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        } catch(e: Exception) {
+            null
+        }
+        if (firestoreDb != null) {
+            firestoreDb.collection("messages")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) return@addSnapshotListener
+                    if (snapshot != null) {
+                        val isTopEmployee = com.example.ui.RosterData.topEmployees.any { 
+                            com.example.ui.RosterData.isSameOfficer(it.name, activeUserName)
+                        }
+                        val targetShift = if (isTopEmployee) "top" else "bottom"
+                        
+                        val unread = snapshot.documents.mapNotNull { doc ->
+                            val data = doc.data ?: return@mapNotNull null
+                            val id = doc.id
+                            val msgMap = data.toMutableMap()
+                            msgMap["id"] = id
+                            msgMap
+                        }.filter { msg ->
+                            val targetType = msg["targetType"] as? String ?: ""
+                            val targetValue = msg["targetValue"] as? String ?: ""
+                            val msgSender = msg["sender"] as? String ?: ""
+                            val readBy = msg["readBy"] as? Map<*, *> ?: emptyMap<Any, Any>()
                             
-                            val unread = snapshot.documents.mapNotNull { doc ->
-                                val data = doc.data ?: return@mapNotNull null
-                                val id = doc.id
-                                val msgMap = data.toMutableMap()
-                                msgMap["id"] = id
-                                msgMap
-                            }.filter { msg ->
-                                val targetType = msg["targetType"] as? String ?: ""
-                                val targetValue = msg["targetValue"] as? String ?: ""
-                                val readBy = msg["readBy"] as? Map<*, *> ?: emptyMap<Any, Any>()
-                                
-                                val isMyTarget = when (targetType) {
-                                    "all" -> true
-                                    "shift" -> targetValue == targetShift
-                                    "individual" -> targetValue.trim().equals(userName.trim(), ignoreCase = true)
-                                    else -> false
+                            val isSender = activeUserName.isNotBlank() && com.example.ui.RosterData.isSameOfficer(msgSender, activeUserName)
+
+                            val isMyTarget = when (targetType) {
+                                "all" -> !isSender
+                                "shift" -> targetValue == targetShift && !isSender
+                                "individual" -> {
+                                    if (activeUserName.isBlank()) {
+                                        false
+                                    } else {
+                                        val isTarget = com.example.ui.RosterData.isSameOfficer(targetValue, activeUserName)
+                                        isTarget && !isSender
+                                    }
                                 }
-                                
-                                val alreadyRead = readBy.keys.any { key ->
-                                    key.toString().trim().equals(userName.trim(), ignoreCase = true)
-                                }
-                                
-                                isMyTarget && !alreadyRead
-                            }.sortedBy { 
-                                it["createdAt"] as? String ?: "" 
+                                else -> false
                             }
+                            
+                            val alreadyRead = if (activeUserName.isBlank()) false else readBy.keys.any { key ->
+                                com.example.ui.RosterData.isSameOfficer(key.toString(), activeUserName)
+                            }
+                            
+                            isMyTarget && !alreadyRead
+                        }.sortedBy { 
+                            it["createdAt"] as? String ?: "" 
+                        }
                             
                             if (unread.isNotEmpty() && shownPendingMessageDialog == null) {
                                 shownPendingMessageDialog = unread.first()
                             }
+
+                            for (msg in unread) {
+                                val msgTitle = msg["title"] as? String ?: ""
+                                val msgBody = msg["body"] as? String ?: ""
+                                val msgId = msg["id"] as? String
+                                if (msgTitle.isNotBlank() && msgBody.isNotBlank()) {
+                                    com.example.ui.RosterData.addInAppNotification(context, msgTitle, msgBody, msgId)
+                                }
+                            }
                         }
                     }
             }
-        }
     }
 
     if (showManageMessagesDialog) {
@@ -545,8 +711,9 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                             if (msgId.isNotEmpty()) {
                                 try {
                                     val firestoreDb = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    val readUserKey = if (activeUserName.isNotBlank()) activeUserName else "user"
                                     firestoreDb.collection("messages").document(msgId)
-                                        .update("readBy.${userName}", java.time.Instant.now().toString())
+                                        .update("readBy.${readUserKey}", java.time.Instant.now().toString())
                                         .addOnCompleteListener {
                                             shownPendingMessageDialog = null
                                         }
@@ -578,10 +745,15 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
         }
     }
 
-    LaunchedEffect(userName) {
-        viewModel.activeUserName = userName
+    LaunchedEffect(activeUserName) {
+        viewModel.activeUserName = activeUserName
+        com.example.ui.FirebaseSync.init(context)
+        com.example.ui.FirebaseSync.startListeningCurrentMonth(context)
         com.example.ui.RosterData.onCellUpdatedExternal = { employeeName, day, code, hours ->
-            if (employeeName.trim().equals(userName.trim(), ignoreCase = true)) {
+            val curPrefs = context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE)
+            val currentActiveUser = curPrefs.getString("logged_in_user_name", "")?.takeIf { it.isNotBlank() }
+                ?: curPrefs.getString("user_name", "") ?: activeUserName
+            if (currentActiveUser.isNotBlank() && com.example.ui.RosterData.isSameOfficer(employeeName, currentActiveUser)) {
                 val yearMonth = com.example.ui.RosterData.getYearMonthForIndex(com.example.ui.RosterData.activeRosterMonth)
                 val date = yearMonth.atDay(day)
                 val finalCode = when (code) {
@@ -592,17 +764,13 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                     "D" -> "VACATION"
                     "CH" -> "SICK"
                     "KZ", "KZS", "KZV", "KZVS" -> "KZ"
-                    "Par" -> "Par"
+                    "Par", "PAR" -> "Par"
                     "P" -> "MEETING"
                     "V" -> "TRAINING"
-                    else -> "NONE"
+                    else -> if (code.isNullOrBlank() || code.equals("NONE", ignoreCase = true) || code.lowercase().contains("voľno")) "NONE" else code
                 }
                 val finalLength = hours?.replace(',', '.')?.toDoubleOrNull()?.toInt() ?: when (finalCode) {
-                    "MORNING", "MORNING_PR", "NIGHT", "NIGHT_PN" -> 12
-                    "VACATION" -> 12
-                    "SICK" -> 12
-                    "KZ" -> 12
-                    "Par" -> 12
+                    "MORNING", "MORNING_PR", "NIGHT", "NIGHT_PN", "VACATION", "SICK", "KZ", "Par" -> 12
                     "MEETING" -> 2
                     "TRAINING" -> 5
                     else -> 0
@@ -610,9 +778,9 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 viewModel.setShiftType(date, finalCode, finalLength, syncToRosterEnabled = false)
             }
         }
-        if (userName.isNotBlank()) {
+        if (activeUserName.isNotBlank()) {
             for (m in 0..12) {
-                com.example.ui.RosterData.syncRosterToSichereForUser(userName, m)
+                com.example.ui.RosterData.syncRosterToSichereForUser(activeUserName, m, context)
             }
         }
     }
@@ -660,9 +828,10 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 
                 NavigationDrawerItem(
                     label = { Text("Moje zmeny (Šichter)", fontWeight = FontWeight.Bold) },
-                    selected = currentView == "shichter",
+                    selected = currentView == "shichter" && selectedOfficerForEdit == null,
                     onClick = {
                         coroutineScope.launch {
+                            selectedOfficerForEdit = null
                             viewModel.setCurrentView("shichter")
                             drawerState.close()
                         }
@@ -685,7 +854,153 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
                     )
                 }
-                
+
+                if (isAdminOrPoverena) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Úprava smien príslušníka",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        var showOfficerMenuInDrawer by remember { mutableStateOf(false) }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (selectedOfficerForEdit != null)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            onClick = { showOfficerMenuInDrawer = true }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = if (selectedOfficerForEdit != null) Icons.Default.Person else Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = selectedOfficerForEdit ?: "Moje zmeny ($activeUserName)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selectedOfficerForEdit != null) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (selectedOfficerForEdit != null) {
+                                            Text(
+                                                text = "Režim úpravy príslušníka",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                            )
+                                        }
+                                    }
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showOfficerMenuInDrawer,
+                                onDismissRequest = { showOfficerMenuInDrawer = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Moje zmeny ($activeUserName)", fontWeight = FontWeight.Bold) },
+                                    onClick = {
+                                        selectedOfficerForEdit = null
+                                        showOfficerMenuInDrawer = false
+                                        coroutineScope.launch {
+                                            viewModel.setCurrentView("shichter")
+                                            drawerState.close()
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                )
+                                HorizontalDivider()
+                                val allEmpNames = remember(com.example.ui.RosterData.topEmployees, com.example.ui.RosterData.bottomEmployees, selectedMonth) {
+                                    com.example.ui.RosterData.getAllKnownOfficerNames(context)
+                                }
+                                allEmpNames.forEach { empName ->
+                                    DropdownMenuItem(
+                                        text = { Text(empName) },
+                                        onClick = {
+                                            selectedOfficerForEdit = empName
+                                            hasOfficerUnsavedChanges = false
+                                            showOfficerMenuInDrawer = false
+                                            coroutineScope.launch {
+                                                viewModel.setCurrentView("shichter")
+                                                drawerState.close()
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Person, contentDescription = null)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        if (selectedOfficerForEdit != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    selectedOfficerForEdit = null
+                                    coroutineScope.launch {
+                                        viewModel.setCurrentView("shichter")
+                                        drawerState.close()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Ukončiť úpravu príslušníka", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.weight(1f))
                 
                 Text(
@@ -725,32 +1040,36 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         )
                     },
                     actions = {
-                        if (!isRosterNotificationsEnabled) {
-                            val notifications = com.example.ui.RosterData.inAppNotifications
-                            val unreadCount = notifications.size
-                            
-                            IconButton(
-                                onClick = { showNotificationsDialog = true },
-                                modifier = Modifier.testTag("notifications_bell_btn")
-                            ) {
-                                BadgedBox(
-                                    badge = {
-                                        if (unreadCount > 0) {
-                                            Badge(
-                                                containerColor = Color.Red,
-                                                contentColor = Color.White
-                                            ) {
-                                                Text(text = unreadCount.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                            }
+                        val notifications = com.example.ui.RosterData.inAppNotifications
+                        val unreadCount = notifications.count { !it.isRead }
+                        
+                        IconButton(
+                            onClick = { 
+                                showNotificationsDialog = true 
+                            },
+                            modifier = Modifier.testTag("notifications_bell_btn")
+                        ) {
+                            BadgedBox(
+                                badge = {
+                                    if (unreadCount > 0) {
+                                        Badge(
+                                            containerColor = Color.Red,
+                                            contentColor = Color.White
+                                        ) {
+                                            Text(
+                                                text = if (unreadCount > 99) "99+" else unreadCount.toString(),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
                                     }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Notifications,
-                                        tint = if (unreadCount > 0) Color.Red else MaterialTheme.colorScheme.onSurface,
-                                        contentDescription = "Upozornenia"
-                                    )
                                 }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    tint = if (unreadCount > 0) Color.Red else Color.White,
+                                    contentDescription = "Centrum upozornení"
+                                )
                             }
                         }
 
@@ -766,6 +1085,7 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
+                                tint = Color.White,
                                 contentDescription = "Nastavenia"
                             )
                         }
@@ -781,7 +1101,12 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 RosterScreen(
                     modifier = Modifier
                         .padding(innerPadding)
-                        .fillMaxSize()
+                        .fillMaxSize(),
+                    onOpenShichterForOfficer = { officerName ->
+                        selectedOfficerForEdit = officerName
+                        hasOfficerUnsavedChanges = false
+                        viewModel.setCurrentView("shichter")
+                    }
                 )
             } else {
                 Column(
@@ -790,6 +1115,141 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
+            // Officer Shift Editing Mode Banner
+            if (selectedOfficerForEdit != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Úprava smien: $selectedOfficerForEdit",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Kliknutím na dni v kalendári upravujete jeho/jej zmeny",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val targetOfficer = selectedOfficerForEdit ?: return@Button
+                                    val mIdx = when {
+                                        selectedMonth.year == 2025 && selectedMonth.monthValue == 12 -> 0
+                                        selectedMonth.year == 2026 -> selectedMonth.monthValue.coerceIn(1, 12)
+                                        else -> 1
+                                    }
+                                    val daysInM = selectedMonth.lengthOfMonth()
+
+                                    for (d in 1..daysInM) {
+                                        val dStr = selectedMonth.atDay(d).toString()
+                                        val shift = officerShiftDraftMap[dStr]
+                                        val (code, hours) = when (shift?.shiftType) {
+                                            "MORNING", "R" -> "R" to (shift.shiftLength.toString())
+                                            "MORNING_PR", "PR" -> "PR" to (shift.shiftLength.toString())
+                                            "NIGHT", "N" -> "N" to (shift.shiftLength.toString())
+                                            "NIGHT_PN", "PN" -> "PN" to (shift.shiftLength.toString())
+                                            "VACATION", "D" -> "D" to (shift.shiftLength.toString())
+                                            "SICK", "CH" -> "CH" to (shift.shiftLength.toString())
+                                            "KZ" -> "KZ" to (shift.shiftLength.toString())
+                                            "Par", "PAR" -> "Par" to (shift.shiftLength.toString())
+                                            "MEETING", "P" -> "P" to (shift.shiftLength.toString())
+                                            "TRAINING", "V" -> "V" to (shift.shiftLength.toString())
+                                            "NONE", "Voľno", "", null -> null to null
+                                            else -> (shift?.shiftType) to (shift?.shiftLength?.toString())
+                                        }
+                                        com.example.ui.RosterData.updateCellForMonth(mIdx, targetOfficer, d, code, hours)
+                                    }
+                                    com.example.ui.RosterData.saveCurrentState(mIdx)
+                                    com.example.ui.FirebaseSync.uploadCurrentRosterToFirestore(context, mIdx)
+                                    com.example.ui.RosterData.syncRosterToSichereForUser(targetOfficer, mIdx, context)
+
+                                    if (!com.example.ui.RosterData.isSameOfficer(targetOfficer, activeUserName)) {
+                                        val monthStr = "${selectedMonth.monthValue}/${selectedMonth.year}"
+                                        val senderName = if (activeUserName.trim().equals("admin", ignoreCase = true)) "Administrátor" else activeUserName
+                                        val notifTitle = "Zmena v rozpise smien"
+                                        val notifBody = "Užívateľ $senderName vám upravil rozpis smien na mesiac $monthStr."
+
+                                        com.example.ui.RosterData.triggerRosterNotification(
+                                            context = context,
+                                            title = notifTitle,
+                                            message = notifBody,
+                                            targetOfficer = targetOfficer,
+                                            sender = senderName
+                                        )
+                                    }
+
+                                    if (com.example.ui.RosterData.isSameOfficer(targetOfficer, activeUserName)) {
+                                        for (d in 1..daysInM) {
+                                            val dateObj = selectedMonth.atDay(d)
+                                            val shift = officerShiftDraftMap[dateObj.toString()]
+                                            if (shift != null) {
+                                                viewModel.setShiftType(dateObj, shift.shiftType, shift.shiftLength, syncToRosterEnabled = false)
+                                            }
+                                        }
+                                    }
+
+                                    selectedOfficerForEdit = null
+                                    hasOfficerUnsavedChanges = false
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Zmeny pre príslušníka $targetOfficer boli úspešne uložené!",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Uložiť", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    selectedOfficerForEdit = null
+                                    hasOfficerUnsavedChanges = false
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Zrušiť",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             // Read-Only Preview Mode indicator banner
             if (isReadOnlyPreview) {
                 Surface(
@@ -857,19 +1317,14 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 )
             }
 
-            // Custom Calendar Grid Composable (with horizontal swiping to change months)
+            // Custom Calendar Grid Composable
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onSwipeHorizontal(
-                        onSwipeLeft = { viewModel.nextMonth() },
-                        onSwipeRight = { viewModel.previousMonth() }
-                    )
+                modifier = Modifier.fillMaxWidth()
             ) {
                 CalendarGrid(
                     selectedMonth = selectedMonth,
                     selectedDate = selectedDate,
-                    shiftDays = allShiftDays,
+                    shiftDays = effectiveShiftDays,
                     onDateSelected = { viewModel.selectDate(it) }
                 )
             }
@@ -943,6 +1398,71 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                     0 -> {
                         // TAB 1: Day Details Editor
                         val dateToEdit = selectedDate
+                        val quickFillTemplateAction: (List<String>, Int) -> Unit = { sequence, length ->
+                            if (selectedOfficerForEdit != null) {
+                                val daysInM = selectedMonth.lengthOfMonth()
+                                var anchorDayNum: Int? = null
+                                var anchorShiftType: String? = null
+
+                                if (dateToEdit != null && dateToEdit.year == selectedMonth.year && dateToEdit.monthValue == selectedMonth.monthValue) {
+                                    val existingSel = officerShiftDraftMap[dateToEdit.toString()]
+                                    if (existingSel != null && existingSel.shiftType != "NONE" && existingSel.shiftType in sequence) {
+                                        anchorDayNum = dateToEdit.dayOfMonth
+                                        anchorShiftType = existingSel.shiftType
+                                    }
+                                }
+
+                                if (anchorShiftType == null) {
+                                    for (d in 1..daysInM) {
+                                        val dStr = selectedMonth.atDay(d).toString()
+                                        val existing = officerShiftDraftMap[dStr]
+                                        if (existing != null && existing.shiftType != "NONE" && existing.shiftType in sequence) {
+                                            anchorDayNum = d
+                                            anchorShiftType = existing.shiftType
+                                            break
+                                        }
+                                    }
+                                }
+
+                                val finalAnchorDayNum = anchorDayNum ?: 1
+                                val finalAnchorShiftType = anchorShiftType ?: sequence.firstOrNull { it != "NONE" } ?: "NIGHT"
+                                val anchorIndex = sequence.indexOf(finalAnchorShiftType).let { if (it == -1) 0 else it }
+                                val seqSize = sequence.size
+                                val newDraft = officerShiftDraftMap.toMutableMap()
+
+                                for (d in 1..daysInM) {
+                                    val dStr = selectedMonth.atDay(d).toString()
+                                    val daysFromAnchor = d - finalAnchorDayNum
+                                    val seqIdx = (((anchorIndex + daysFromAnchor) % seqSize) + seqSize) % seqSize
+                                    val type = sequence[seqIdx]
+                                    val existing = newDraft[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = length)
+                                    newDraft[dStr] = existing.copy(shiftType = type, shiftLength = length)
+                                }
+                                officerShiftDraftMap = newDraft
+                                hasOfficerUnsavedChanges = true
+                            } else {
+                                viewModel.applyTemplateForRemainingDays(sequence, length)
+                            }
+                            android.widget.Toast.makeText(context, "Kolobeh smien bol úspešne aplikovaný!", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+
+                        val clearMonthAction: () -> Unit = {
+                            if (selectedOfficerForEdit != null) {
+                                val daysInM = selectedMonth.lengthOfMonth()
+                                val newDraft = officerShiftDraftMap.toMutableMap()
+                                for (d in 1..daysInM) {
+                                    val dStr = selectedMonth.atDay(d).toString()
+                                    val existing = newDraft[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = 8)
+                                    newDraft[dStr] = existing.copy(shiftType = "NONE", shiftLength = 8, note = null, reminderText = null, overtimeHours = 0)
+                                }
+                                officerShiftDraftMap = newDraft
+                                hasOfficerUnsavedChanges = true
+                            } else {
+                                viewModel.clearCurrentMonthData()
+                            }
+                            android.widget.Toast.makeText(context, "Mesiac bol úspešne vyčistený!", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+
                         if (dateToEdit == null) {
                             Column(
                                 modifier = Modifier
@@ -983,12 +1503,8 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                                 if (!isReadOnlyPreview) {
                                     MonthQuickActionsCard(
                                         defaultShiftLength = defaultShiftLength,
-                                        onQuickFillTemplate = { sequence, length ->
-                                            viewModel.applyTemplateForRemainingDays(sequence, length)
-                                        },
-                                        onClearMonth = {
-                                            viewModel.clearCurrentMonthData()
-                                        }
+                                        onQuickFillTemplate = quickFillTemplateAction,
+                                        onClearMonth = clearMonthAction
                                     )
                                 }
                             }
@@ -996,14 +1512,14 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                             if (isReadOnlyPreview) {
                                 ReadOnlyDayView(
                                     selectedDate = dateToEdit,
-                                    currentShift = currentShift,
+                                    currentShift = effectiveCurrentShift,
                                     onDeselectDate = { viewModel.clearSelectedDate() },
                                     listState = editDayListState
                                 )
                             } else {
                                 DayEditorView(
                                     selectedDate = dateToEdit,
-                                    currentShift = currentShift,
+                                    currentShift = effectiveCurrentShift,
                                     defaultShiftLength = defaultShiftLength,
                                     isCleanerModeEnabled = isCleanerModeEnabled,
                                     onShiftTypeSelected = { type ->
@@ -1012,32 +1528,68 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                                             "TRAINING" -> 5
                                             else -> defaultShiftLength
                                         }
-                                        viewModel.setShiftType(dateToEdit, type, length)
-                                    },
-                                    onShiftLengthSelected = { len -> viewModel.setShiftLength(dateToEdit, len) },
-                                    onOvertimeHoursSelected = { hours -> viewModel.setOvertimeHours(dateToEdit, hours) },
-                                    onSaveNotes = { note, reminder ->
-                                        viewModel.saveNoteAndReminder(dateToEdit, note, reminder)
-                                        if (!reminder.isNullOrBlank()) {
-                                            ReminderReceiver.scheduleReminder(context, dateToEdit, reminder, note)
+                                        if (selectedOfficerForEdit != null) {
+                                            val dStr = dateToEdit.toString()
+                                            val existing = officerShiftDraftMap[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = defaultShiftLength)
+                                            officerShiftDraftMap = officerShiftDraftMap + (dStr to existing.copy(shiftType = type, shiftLength = length))
+                                            hasOfficerUnsavedChanges = true
                                         } else {
-                                            ReminderReceiver.cancelReminder(context, dateToEdit)
+                                            viewModel.setShiftType(dateToEdit, type, length)
                                         }
                                     },
-                                    onQuickFillTemplate = { sequence, length ->
-                                        viewModel.applyTemplateForRemainingDays(sequence, length)
+                                    onShiftLengthSelected = { len ->
+                                        if (selectedOfficerForEdit != null) {
+                                            val dStr = dateToEdit.toString()
+                                            val existing = officerShiftDraftMap[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = defaultShiftLength)
+                                            officerShiftDraftMap = officerShiftDraftMap + (dStr to existing.copy(shiftLength = len))
+                                            hasOfficerUnsavedChanges = true
+                                        } else {
+                                            viewModel.setShiftLength(dateToEdit, len)
+                                        }
                                     },
-                                    onClearMonth = {
-                                        viewModel.clearCurrentMonthData()
+                                    onOvertimeHoursSelected = { hours ->
+                                        if (selectedOfficerForEdit != null) {
+                                            val dStr = dateToEdit.toString()
+                                            val existing = officerShiftDraftMap[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = defaultShiftLength)
+                                            officerShiftDraftMap = officerShiftDraftMap + (dStr to existing.copy(overtimeHours = hours))
+                                            hasOfficerUnsavedChanges = true
+                                        } else {
+                                            viewModel.setOvertimeHours(dateToEdit, hours)
+                                        }
                                     },
+                                    onSaveNotes = { note, reminder ->
+                                        if (selectedOfficerForEdit != null) {
+                                            val dStr = dateToEdit.toString()
+                                            val existing = officerShiftDraftMap[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = defaultShiftLength)
+                                            officerShiftDraftMap = officerShiftDraftMap + (dStr to existing.copy(note = note, reminderText = reminder))
+                                            hasOfficerUnsavedChanges = true
+                                        } else {
+                                            viewModel.saveNoteAndReminder(dateToEdit, note, reminder)
+                                            if (!reminder.isNullOrBlank()) {
+                                                ReminderReceiver.scheduleReminder(context, dateToEdit, reminder, note)
+                                            } else {
+                                                ReminderReceiver.cancelReminder(context, dateToEdit)
+                                            }
+                                        }
+                                    },
+                                    onQuickFillTemplate = quickFillTemplateAction,
+                                    onClearMonth = clearMonthAction,
                                     onDeselectDate = {
                                         viewModel.clearSelectedDate()
                                     },
                                     onClearDay = {
-                                        ReminderReceiver.cancelReminder(context, dateToEdit)
-                                        viewModel.clearDayData(dateToEdit)
+                                        if (selectedOfficerForEdit != null) {
+                                            val dStr = dateToEdit.toString()
+                                            officerShiftDraftMap = officerShiftDraftMap + (dStr to ShiftDay(date = dStr, shiftType = "NONE", shiftLength = 8))
+                                            hasOfficerUnsavedChanges = true
+                                        } else {
+                                            ReminderReceiver.cancelReminder(context, dateToEdit)
+                                            viewModel.clearDayData(dateToEdit)
+                                        }
                                     },
-                                    listState = editDayListState
+                                    listState = editDayListState,
+                                    officerOriginalShift = if (selectedOfficerForEdit != null) officerOriginalShiftsMap[dateToEdit.toString()] else null,
+                                    officerForEditName = selectedOfficerForEdit
                                 )
                             }
                         }
@@ -1046,7 +1598,7 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         // TAB 2: Month Statistics & Reports
                         MonthStatisticsView(
                             selectedMonth = selectedMonth,
-                            shiftDays = allShiftDays,
+                            shiftDays = effectiveShiftDays,
                             vacationAllowance = vacationAllowance,
                             tariffSalary = tariffSalary,
                             personalAllowance = personalAllowance,
@@ -1061,9 +1613,16 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         MonthOverviewView(
                             selectedDate = selectedDate,
                             selectedMonth = selectedMonth,
-                            shiftDays = allShiftDays,
+                            shiftDays = effectiveShiftDays,
                             onSaveDayNotes = { date, note, reminder ->
-                                viewModel.saveNoteAndReminder(date, note, reminder)
+                                if (selectedOfficerForEdit != null) {
+                                    val dStr = date.toString()
+                                    val existing = officerShiftDraftMap[dStr] ?: ShiftDay(date = dStr, shiftType = "NONE", shiftLength = defaultShiftLength)
+                                    officerShiftDraftMap = officerShiftDraftMap + (dStr to existing.copy(note = note, reminderText = reminder))
+                                    hasOfficerUnsavedChanges = true
+                                } else {
+                                    viewModel.saveNoteAndReminder(date, note, reminder)
+                                }
                             },
                             basicHourlyRate = tariffSalary.toDouble() / 177.0,
                             listState = overviewListState
@@ -1179,6 +1738,14 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 showPermissionsDialog = true
                 showSettingsDialog = false
             },
+            onLogout = {
+                prefs.edit()
+                    .putBoolean("is_logged_in", false)
+                    .remove("logged_in_user_name")
+                    .apply()
+                onLogout()
+                showSettingsDialog = false
+            },
             onDismiss = { showSettingsDialog = false }
         )
     }
@@ -1225,9 +1792,29 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
         )
     }
 
-    // In-app Notifications Dialog
+    // Centrum Upozornení Dialog
     if (showNotificationsDialog) {
+        LaunchedEffect(Unit) {
+            com.example.ui.RosterData.loadInAppNotifications(context)
+        }
         val notifications = com.example.ui.RosterData.inAppNotifications
+        var selectedFilter by remember { mutableStateOf("ALL") } // "ALL", "ROSTER", "MESSAGE", "REMINDER"
+
+        val filteredNotifications = remember(notifications, selectedFilter) {
+            when (selectedFilter) {
+                "ROSTER" -> notifications.filter { 
+                    it.title.contains("rozpis", ignoreCase = true) || it.title.contains("služb", ignoreCase = true) || it.title.contains("zmena", ignoreCase = true) 
+                }
+                "MESSAGE" -> notifications.filter { 
+                    it.title.contains("správ", ignoreCase = true) || it.title.contains("oznam", ignoreCase = true) 
+                }
+                "REMINDER" -> notifications.filter { 
+                    it.title.contains("pripomienk", ignoreCase = true) || it.title.contains("poznámk", ignoreCase = true) 
+                }
+                else -> notifications
+            }
+        }
+
         AlertDialog(
             onDismissRequest = { showNotificationsDialog = false },
             title = {
@@ -1241,75 +1828,185 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                         contentDescription = null
                     )
                     Text(
-                        text = "Upozornenia o zmenách",
+                        text = "Centrum upozornení",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             text = {
-                if (notifications.isEmpty()) {
-                    Box(
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Uniform Filter Buttons
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 24.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
-                            text = "Žiadne nové upozornenia.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        val filterOptions = listOf(
+                            "ALL" to "Všetky",
+                            "ROSTER" to "Rozpis",
+                            "MESSAGE" to "Správy",
+                            "REMINDER" to "Pripomienky"
                         )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 300.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(notifications) { item ->
-                            val title = item.first
-                            val desc = item.second
-                            val ts = item.third
-                            val timeStr = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(ts))
-                            
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                ),
-                                shape = RoundedCornerShape(8.dp)
+                        filterOptions.forEach { (key, label) ->
+                            val isSelected = selectedFilter == key
+                            val count = when (key) {
+                                "ROSTER" -> notifications.count {
+                                    it.title.contains("rozpis", ignoreCase = true) || it.title.contains("služb", ignoreCase = true) || it.title.contains("zmena", ignoreCase = true)
+                                }
+                                "MESSAGE" -> notifications.count {
+                                    it.title.contains("správ", ignoreCase = true) || it.title.contains("oznam", ignoreCase = true)
+                                }
+                                "REMINDER" -> notifications.count {
+                                    it.title.contains("pripomienk", ignoreCase = true) || it.title.contains("poznámk", ignoreCase = true)
+                                }
+                                else -> notifications.size
+                            }
+
+                            Surface(
+                                onClick = { selectedFilter = key },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(8.dp)
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (count > 0) "$label ($count)" else label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 1,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (filteredNotifications.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Žiadne upozornenia v tejto kategórii.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 350.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(filteredNotifications) { item ->
+                                val title = item.title
+                                val desc = item.text
+                                val ts = item.timestamp
+                                val timeStr = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(ts))
+                                
+                                val isRoster = title.contains("rozpis", ignoreCase = true) || title.contains("zmena", ignoreCase = true) || title.contains("služb", ignoreCase = true)
+                                val isMessage = title.contains("správ", ignoreCase = true) || title.contains("oznam", ignoreCase = true)
+                                val isReminder = title.contains("pripomienk", ignoreCase = true) || title.contains("poznámk", ignoreCase = true)
+
+                                val itemIcon = when {
+                                    isMessage -> Icons.Default.Email
+                                    isReminder -> Icons.Default.EventNote
+                                    else -> Icons.Default.EditCalendar
+                                }
+
+                                val categoryLabel = when {
+                                    isMessage -> "SPRÁVA"
+                                    isReminder -> "PRIPOMIENKA"
+                                    else -> "ROZPIS"
+                                }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.Top
                                     ) {
-                                        Text(
-                                            text = title,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Text(
-                                            text = timeStr,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                        )
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = itemIcon,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                                ) {
+                                                    Text(
+                                                        text = categoryLabel,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = timeStr,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = title,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+
+                                            if (desc.isNotBlank()) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = desc,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = desc,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
                                 }
                             }
                         }
@@ -1317,23 +2014,55 @@ fun ShiftAppScreen(viewModel: ShiftViewModel, onLogout: () -> Unit = {}) {
                 }
             },
             confirmButton = {
-                if (notifications.isNotEmpty()) {
-                    TextButton(
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
                         onClick = {
-                            com.example.ui.RosterData.clearInAppNotifications(context)
+                            com.example.ui.RosterData.markAllNotificationsAsRead(context)
                             showNotificationsDialog = false
                         },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Vymazať všetko")
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Zavrieť", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    if (notifications.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                com.example.ui.RosterData.clearInAppNotifications(context)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Vymazať vše", fontSize = 13.sp)
+                        }
                     }
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showNotificationsDialog = false }) {
-                    Text("Zavrieť")
-                }
-            },
+            dismissButton = null,
             shape = RoundedCornerShape(16.dp)
         )
     }
@@ -1761,6 +2490,7 @@ fun SettingsDialog(
     onShiftAllowanceChange: (Float) -> Unit,
     onMealAllowanceChange: (Float) -> Unit,
     onShowPermissions: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var isFinancialSettingsExpanded by remember { mutableStateOf(false) }
@@ -2302,6 +3032,42 @@ fun SettingsDialog(
                             contentDescription = "Firebase Synchronizácia",
                             tint = if (com.example.ui.FirebaseSync.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.testTag("firebase_sync_btn_icon")
+                        )
+                    }
+                }
+
+                if (onLogout != null) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onLogout()
+                                onDismiss()
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Odhlásiť sa",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "Uzamkne celú aplikáciu a vráti vás na prihlasovaciu obrazovku.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Odhlásiť sa",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag("logout_btn_icon")
                         )
                     }
                 }
@@ -3598,6 +4364,224 @@ fun ReadOnlyDayView(
 }
 
 @Composable
+fun OfficerSichterOverviewCard(
+    officerName: String,
+    selectedMonth: YearMonth,
+    originalShifts: Map<String, ShiftDay>,
+    draftShifts: Map<String, ShiftDay>,
+    selectedDate: LocalDate?,
+    onSelectDay: (LocalDate) -> Unit,
+    onResetToOriginal: () -> Unit
+) {
+    val daysInMonth = selectedMonth.lengthOfMonth()
+
+    val countMorning = originalShifts.values.count { it.shiftType in listOf("MORNING", "MORNING_PR") }
+    val countNight = originalShifts.values.count { it.shiftType in listOf("NIGHT", "NIGHT_PN") }
+    val countVacation = originalShifts.values.count { it.shiftType == "VACATION" }
+    val countSick = originalShifts.values.count { it.shiftType == "SICK" }
+    val totalHours = originalShifts.values.sumOf { if (it.shiftType != "NONE") it.shiftLength else 0 }
+
+    val hasChanges = draftShifts != originalShifts
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Rozloženie smien v šichtéri ($officerName)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (hasChanges) {
+                    TextButton(
+                        onClick = onResetToOriginal,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Obnoviť šichtér", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            // Summary Stats Chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = Color(0xFF2E7D32).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Ranné: $countMorning",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2E7D32),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+                Surface(
+                    color = Color(0xFF1565C0).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Nočné: $countNight",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1565C0),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+                Surface(
+                    color = Color(0xFFE65100).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Dovolenka: $countVacation",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE65100),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+                Surface(
+                    color = Color(0xFFC62828).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Choroba: $countSick",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFC62828),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Spolu: ${totalHours}h",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            // Scrollable Day Schedule Ribbon
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(daysInMonth) { index ->
+                    val dayNum = index + 1
+                    val dateObj = selectedMonth.atDay(dayNum)
+                    val dateStr = dateObj.toString()
+                    val origShift = originalShifts[dateStr]
+                    val draftShift = draftShifts[dateStr]
+                    val isSelected = selectedDate == dateObj
+
+                    val origType = origShift?.shiftType ?: "NONE"
+                    val draftType = draftShift?.shiftType ?: "NONE"
+                    val isModified = origType != draftType
+
+                    val code = when (origType) {
+                        "MORNING" -> "R"
+                        "MORNING_PR" -> "PR"
+                        "NIGHT" -> "N"
+                        "NIGHT_PN" -> "PN"
+                        "VACATION" -> "D"
+                        "SICK" -> "CH"
+                        "KZ" -> "KZ"
+                        "Par" -> "Par"
+                        "P" -> "P"
+                        "V" -> "V"
+                        else -> "-"
+                    }
+
+                    val bgColor = when (origType) {
+                        "MORNING", "MORNING_PR" -> Color(0xFF2E7D32)
+                        "NIGHT", "NIGHT_PN" -> Color(0xFF1565C0)
+                        "VACATION" -> Color(0xFFE65100)
+                        "SICK" -> Color(0xFFC62828)
+                        "KZ", "Par" -> Color(0xFF6A1B9A)
+                        "P", "V" -> Color(0xFF00838F)
+                        else -> Color.Gray.copy(alpha = 0.3f)
+                    }
+
+                    Surface(
+                        onClick = { onSelectDay(dateObj) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else bgColor.copy(alpha = 0.2f),
+                        border = if (isModified) BorderStroke(1.5.dp, MaterialTheme.colorScheme.error) else if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "${dayNum}.",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = code,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else bgColor
+                            )
+                            if (isModified) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(MaterialTheme.colorScheme.error, CircleShape)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun DayEditorView(
     selectedDate: LocalDate,
     currentShift: ShiftDay?,
@@ -3611,7 +4595,9 @@ fun DayEditorView(
     onClearMonth: () -> Unit,
     onDeselectDate: () -> Unit,
     onClearDay: () -> Unit,
-    listState: LazyListState = rememberLazyListState()
+    listState: LazyListState = rememberLazyListState(),
+    officerOriginalShift: ShiftDay? = null,
+    officerForEditName: String? = null
 ) {
     val focusManager = LocalFocusManager.current
     var noteText by remember(selectedDate) { mutableStateOf("") }
@@ -3883,6 +4869,82 @@ fun DayEditorView(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Zrušiť tento deň (vynulovať)", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Officer's self-chosen shift card
+        if (officerForEditName != null && officerOriginalShift != null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onTertiary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Zvolené v šichtéri ($officerForEditName):",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                            )
+                            val origTypeDesc = when (officerOriginalShift.shiftType) {
+                                "MORNING" -> "Ranná služba (R, ${officerOriginalShift.shiftLength}h)"
+                                "MORNING_PR" -> "PCO ranná (PR, ${officerOriginalShift.shiftLength}h)"
+                                "NIGHT" -> "Nočná služba (N, ${officerOriginalShift.shiftLength}h)"
+                                "NIGHT_PN" -> "PCO nočná (PN, ${officerOriginalShift.shiftLength}h)"
+                                "VACATION" -> "Dovolenka (D, ${officerOriginalShift.shiftLength}h)"
+                                "SICK" -> "Choroba (CH, ${officerOriginalShift.shiftLength}h)"
+                                "KZ" -> "Kĺzavé voľno (KZ, ${officerOriginalShift.shiftLength}h)"
+                                "Par" -> "Paragraf (Par, ${officerOriginalShift.shiftLength}h)"
+                                "MEETING" -> "Porada (P, ${officerOriginalShift.shiftLength}h)"
+                                "TRAINING" -> "Vzdelávanie (V, ${officerOriginalShift.shiftLength}h)"
+                                else -> "Voľno"
+                            }
+                            Text(
+                                text = origTypeDesc,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+
+                            val currentType = currentShift?.shiftType ?: "NONE"
+                            if (currentType != officerOriginalShift.shiftType) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "⚡ Pripravovaná zmena od admina",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -6555,7 +7617,8 @@ fun parseFirebaseWebConfig(rawText: String): Map<String, String> {
 fun RosterMessagesManagementDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("shift_prefs", android.content.Context.MODE_PRIVATE) }
-    val userName = remember { prefs.getString("user_name", "Admin") ?: "Admin" }
+    val loggedInUser = prefs.getString("logged_in_user_name", "") ?: ""
+    val userName = if (loggedInUser.isNotBlank()) loggedInUser else (prefs.getString("user_name", "Admin") ?: "Admin")
     
     var titleInput by remember { mutableStateOf("") }
     var bodyInput by remember { mutableStateOf("") }
@@ -6596,10 +7659,7 @@ fun RosterMessagesManagementDialog(onDismiss: () -> Unit) {
     
     // Roster employee list for individual selector
     val employeeNames = remember {
-        (com.example.ui.RosterData.topEmployees.map { it.name } + 
-         com.example.ui.RosterData.bottomEmployees.map { it.name })
-        .filter { it.isNotBlank() }
-        .sorted()
+        com.example.ui.RosterData.getAllKnownOfficerNames(context)
     }
     
     var showTargetDropdown by remember { mutableStateOf(false) }
