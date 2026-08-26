@@ -56,28 +56,48 @@ fun LoginScreen(
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
 
     val normSelected = remember(selectedName) { normalizeLoginName(selectedName) }
+    val cleanSelected = remember(selectedName) { RosterData.cleanOfficerName(selectedName) }
 
-    val isRiegerT = remember(normSelected) {
-        normSelected == "riegert"
+    val isRiegerT = remember(normSelected, cleanSelected) {
+        normSelected == "riegert" || cleanSelected == "riegert" || RosterData.isSameOfficer(selectedName, "Rieger T.")
     }
 
-    val isAdmin = remember(normSelected) {
-        normSelected == "admin"
+    val isAdmin = remember(normSelected, cleanSelected) {
+        normSelected == "admin" || cleanSelected == "admin"
     }
 
-    val isTestUser = remember(normSelected) {
-        normSelected == "test"
+    val isTestUser = remember(normSelected, cleanSelected) {
+        normSelected == "test" || cleanSelected == "test"
     }
 
-    val matchedRosterEmployee = remember(normSelected, employeeNames) {
+    val isNemecM = remember(normSelected, cleanSelected) {
+        normSelected == "nemecm" || cleanSelected == "nemecm" || cleanSelected.startsWith("nemec") || RosterData.isSameOfficer(selectedName, "Nemec M.")
+    }
+
+    val isLukacM = remember(normSelected, cleanSelected) {
+        normSelected == "lukacm" || normSelected == "lukáčm" || normSelected == "lukacmartin" || normSelected == "lukáčmartin" ||
+        cleanSelected == "lukacm" || cleanSelected == "lukacmartin" || cleanSelected.startsWith("lukac") ||
+        RosterData.isSameOfficer(selectedName, "Lukáč Martin") || RosterData.isSameOfficer(selectedName, "Lukáč M.")
+    }
+
+    val isSzelenyiL = remember(normSelected, cleanSelected) {
+        normSelected == "szelenyil" || normSelected == "szelényil" ||
+        cleanSelected == "szelenyil" || cleanSelected.startsWith("szelenyi") ||
+        RosterData.isSameOfficer(selectedName, "Szelényi L.")
+    }
+
+    val matchedRosterEmployee = remember(normSelected, employeeNames, isNemecM, isLukacM, isSzelenyiL) {
         if (normSelected.isBlank()) null
-        else employeeNames.find { normalizeLoginName(it) == normSelected }
+        else if (isNemecM) employeeNames.find { RosterData.isSameOfficer(it, "Nemec M.") } ?: "Nemec M."
+        else if (isLukacM) employeeNames.find { RosterData.isSameOfficer(it, "Lukáč Martin") || RosterData.isSameOfficer(it, "Lukáč M.") } ?: "Lukáč Martin"
+        else if (isSzelenyiL) employeeNames.find { RosterData.isSameOfficer(it, "Szelényi L.") } ?: "Szelényi L."
+        else employeeNames.find { normalizeLoginName(it) == normSelected || RosterData.isSameOfficer(it, selectedName) }
     }
 
     val isNameInRoster = matchedRosterEmployee != null
 
-    val showEmailOption = isNameInRoster && !isRiegerT && !isAdmin && !isTestUser
-    val isSpecialUser = isRiegerT || isAdmin || isTestUser
+    val isSpecialUser = isRiegerT || isAdmin || isTestUser || isNemecM || isLukacM || isSzelenyiL
+    val showEmailOption = isNameInRoster && !isSpecialUser
 
     fun sendEmailCode() {
         val emailTrimmed = emailInput.trim()
@@ -328,7 +348,7 @@ fun LoginScreen(
                         OutlinedTextField(
                             value = passwordInput,
                             onValueChange = { input ->
-                                if (input.length <= 12) {
+                                if (input.length <= 30) {
                                     passwordInput = input
                                     errorMessage = null
                                 }
@@ -380,14 +400,17 @@ fun LoginScreen(
                     Button(
                         onClick = {
                             val normName = normalizeLoginName(selectedName)
+                            val cleanName = RosterData.cleanOfficerName(selectedName)
                             if (normName.isBlank()) {
                                 errorMessage = "Najprv zadajte meno."
                                 return@Button
                             }
 
-                            if (normName == "riegert") {
-                                if (passwordInput == "745325") {
-                                    val finalName = employeeNames.find { normalizeLoginName(it) == "riegert" } ?: "Rieger T."
+                            val passTrim = passwordInput.trim()
+
+                            if (normName == "riegert" || cleanName == "riegert" || RosterData.isSameOfficer(selectedName, "Rieger T.")) {
+                                if (passTrim == "745325") {
+                                    val finalName = employeeNames.find { normalizeLoginName(it) == "riegert" || RosterData.isSameOfficer(it, "Rieger T.") } ?: "Rieger T."
                                     prefs.edit()
                                         .putBoolean("is_logged_in", true)
                                         .putString("logged_in_user_name", finalName)
@@ -398,8 +421,8 @@ fun LoginScreen(
                                 } else {
                                     errorMessage = "Nesprávne heslo pre RiegerT."
                                 }
-                            } else if (normName == "admin") {
-                                if (passwordInput == "admin") {
+                            } else if (normName == "admin" || cleanName == "admin") {
+                                if (passTrim == "admin") {
                                     val finalName = "admin"
                                     prefs.edit()
                                         .putBoolean("is_logged_in", true)
@@ -411,8 +434,8 @@ fun LoginScreen(
                                 } else {
                                     errorMessage = "Nesprávne heslo pre admina."
                                 }
-                            } else if (normName == "test") {
-                                if (passwordInput == "test") {
+                            } else if (normName == "test" || cleanName == "test") {
+                                if (passTrim == "test") {
                                     val finalName = "test"
                                     prefs.edit()
                                         .putBoolean("is_logged_in", true)
@@ -424,13 +447,52 @@ fun LoginScreen(
                                 } else {
                                     errorMessage = "Nesprávne heslo pre test."
                                 }
+                            } else if (isNemecM) {
+                                if (passTrim.equals("Ryba", ignoreCase = true)) {
+                                    val finalName = employeeNames.find { RosterData.isSameOfficer(it, "Nemec M.") } ?: "Nemec M."
+                                    prefs.edit()
+                                        .putBoolean("is_logged_in", true)
+                                        .putString("logged_in_user_name", finalName)
+                                        .putString("user_name", finalName)
+                                        .putString("user_email", emailInput.trim())
+                                        .apply()
+                                    onLoginSuccess(finalName)
+                                } else {
+                                    errorMessage = "Nesprávne heslo pre príslušníka NemecM."
+                                }
+                            } else if (isLukacM) {
+                                if (passTrim.equals("Formula", ignoreCase = true)) {
+                                    val finalName = employeeNames.find { RosterData.isSameOfficer(it, "Lukáč Martin") || RosterData.isSameOfficer(it, "Lukáč M.") } ?: "Lukáč Martin"
+                                    prefs.edit()
+                                        .putBoolean("is_logged_in", true)
+                                        .putString("logged_in_user_name", finalName)
+                                        .putString("user_name", finalName)
+                                        .putString("user_email", emailInput.trim())
+                                        .apply()
+                                    onLoginSuccess(finalName)
+                                } else {
+                                    errorMessage = "Nesprávne heslo pre príslušníka LukáčM."
+                                }
+                            } else if (isSzelenyiL) {
+                                if (passTrim.equals("Cukor", ignoreCase = true)) {
+                                    val finalName = employeeNames.find { RosterData.isSameOfficer(it, "Szelényi L.") } ?: "Szelényi L."
+                                    prefs.edit()
+                                        .putBoolean("is_logged_in", true)
+                                        .putString("logged_in_user_name", finalName)
+                                        .putString("user_name", finalName)
+                                        .putString("user_email", emailInput.trim())
+                                        .apply()
+                                    onLoginSuccess(finalName)
+                                } else {
+                                    errorMessage = "Nesprávne heslo pre príslušníka SzelényiL."
+                                }
                             } else {
                                 val matchedEmployee = matchedRosterEmployee
                                 if (matchedEmployee == null) {
                                     errorMessage = "Zadané meno sa v rozpise nenachádza."
                                 } else {
                                     val savedPassword = prefs.getString("roster_login_password", "") ?: ""
-                                    if (passwordInput == savedPassword && passwordInput.isNotBlank()) {
+                                    if (passTrim == savedPassword && passTrim.isNotBlank()) {
                                         prefs.edit()
                                             .putBoolean("is_logged_in", true)
                                             .putString("logged_in_user_name", matchedEmployee)
@@ -514,10 +576,18 @@ fun LoginScreen(
                                 return@Button
                             }
 
-                            val matchedForgotEmp = if (normForgot == "admin") "admin"
-                                else if (normForgot == "riegert") (employeeNames.find { normalizeLoginName(it) == "riegert" } ?: "Rieger T.")
-                                else if (normForgot == "test") "test"
-                                else employeeNames.find { normalizeLoginName(it) == normForgot }
+                            val cleanForgot = RosterData.cleanOfficerName(forgotName)
+                            val isForgotNemec = normForgot == "nemecm" || cleanForgot == "nemecm" || cleanForgot.startsWith("nemec") || RosterData.isSameOfficer(forgotName, "Nemec M.")
+                            val isForgotLukac = normForgot.startsWith("lukac") || normForgot.startsWith("lukáč") || cleanForgot.startsWith("lukac") || RosterData.isSameOfficer(forgotName, "Lukáč Martin") || RosterData.isSameOfficer(forgotName, "Lukáč M.")
+                            val isForgotSzelenyi = normForgot.startsWith("szelenyi") || normForgot.startsWith("szelényi") || cleanForgot.startsWith("szelenyi") || RosterData.isSameOfficer(forgotName, "Szelényi L.")
+
+                            val matchedForgotEmp = if (normForgot == "admin" || cleanForgot == "admin") "admin"
+                                else if (normForgot == "riegert" || cleanForgot == "riegert" || RosterData.isSameOfficer(forgotName, "Rieger T.")) (employeeNames.find { normalizeLoginName(it) == "riegert" || RosterData.isSameOfficer(it, "Rieger T.") } ?: "Rieger T.")
+                                else if (normForgot == "test" || cleanForgot == "test") "test"
+                                else if (isForgotNemec) (employeeNames.find { RosterData.isSameOfficer(it, "Nemec M.") } ?: "Nemec M.")
+                                else if (isForgotLukac) (employeeNames.find { RosterData.isSameOfficer(it, "Lukáč Martin") || RosterData.isSameOfficer(it, "Lukáč M.") } ?: "Lukáč Martin")
+                                else if (isForgotSzelenyi) (employeeNames.find { RosterData.isSameOfficer(it, "Szelényi L.") } ?: "Szelényi L.")
+                                else employeeNames.find { normalizeLoginName(it) == normForgot || RosterData.isSameOfficer(it, forgotName) }
 
                             if (matchedForgotEmp == null) {
                                 forgotError = "Zadané meno sa v rozpise nenachádza."
@@ -526,16 +596,24 @@ fun LoginScreen(
 
                             forgotError = null
                             // Generate new numeric password for non-special users, or retrieve theirs
-                            val newPass = if (normForgot == "admin") {
+                            val newPass = if (normForgot == "admin" || cleanForgot == "admin") {
                                 "admin"
-                            } else if (normForgot == "riegert") {
+                            } else if (normForgot == "riegert" || cleanForgot == "riegert" || RosterData.isSameOfficer(forgotName, "Rieger T.")) {
                                 "745325"
+                            } else if (normForgot == "test" || cleanForgot == "test") {
+                                "test"
+                            } else if (isForgotNemec) {
+                                "Ryba"
+                            } else if (isForgotLukac) {
+                                "Formula"
+                            } else if (isForgotSzelenyi) {
+                                "Cukor"
                             } else {
                                 (100000..999999).random().toString()
                             }
                             
                             // If it's a regular user, save this as the new password in SharedPreferences
-                            if (normForgot != "admin" && normForgot != "riegert" && normForgot != "test") {
+                            if (normForgot != "admin" && normForgot != "riegert" && normForgot != "test" && !isForgotNemec && !isForgotLukac && !isForgotSzelenyi) {
                                 prefs.edit().putString("roster_login_password", newPass).apply()
                             }
                             
